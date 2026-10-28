@@ -1,7 +1,7 @@
 // Native acceptance entry. It runs in Electron, uses its real IPC/worker/capture path,
 // and never sends global mouse or keyboard input. Keep this file out of release packages.
 import { app, BrowserWindow } from 'electron';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, cpSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { once } from 'node:events';
 import assert from 'node:assert/strict';
@@ -12,6 +12,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 
 const output = resolve('.qa', `native-${randomUUID().slice(0, 8)}`);
 mkdirSync(output, { recursive: true }); process.env.HUMAN_CLI_DATA_DIR = join(output, 'data');
+cpSync(resolve('examples/plugins/cursor-capture-reply'), join(process.env.HUMAN_CLI_DATA_DIR, 'plugins', 'cursor-capture-reply'), { recursive: true });
 const checks = [], errors = [];
 const check = (name, value) => { assert.ok(value, name); checks.push(name); console.log(`PASS ${name}`); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -40,7 +41,7 @@ try {
     writeFileSync(join(output, name), (await win.webContents.capturePage()).toPNG());
   };
   check('Idle desktop waits for AI and has no New note action', await js(home, 'document.querySelector("h1").textContent.includes("AI") && !document.body.textContent.includes("新便签")'));
-  const request = await api('/requests', 'POST', { title: '原生验收：请帮我确认界面', agent: '测试 AI', steps: ['确认主题', '截图后回复'], plugins: [{ id: 'capture', plugin: 'human.screenshot', config: { delayMs: 0, display: 'primary', autoAttach: true } }, { id: 'diagnostics', plugin: 'human.diagnostics', config: {} }] });
+  const request = await api('/requests', 'POST', { title: '原生验收：请帮我确认界面', agent: '测试 AI', steps: ['确认主题', '截图后回复'], plugins: [{ id: 'capture', plugin: 'example.cursor-capture-reply', config: { delayMs: 0, autoAttach: true } }, { id: 'diagnostics', plugin: 'human.diagnostics', config: {} }] });
   const win = await until(() => BrowserWindow.getAllWindows().find((w) => w.requestId === request.id)); await ready(win);
   win.webContents.on('render-process-gone', (_event, info) => errors.push(info.reason));
   win.webContents.on('console-message', (_event, details) => { if (details.level === 'error') errors.push(details.message); });
@@ -54,6 +55,9 @@ try {
   const captured = await api(`/requests/${request.id}`);
   check('Real screenshot worker hides notes and attaches an actual PNG', captured.tools[0].state === 'success' && captured.images.length === 1 && hiddenDuringCapture);
   check('Sidebar execution leaves current note and draft in place', await js(win, 'document.querySelector("#shared-panel").dataset.pane==="note" && document.querySelector("#reply").value==="原生验收已完成"'));
+  await until(() => js(win, 'Boolean(document.querySelector(".reply-note"))'));
+  check('Cursor capture extension automatically attaches a visible caption without replacing typed text', captured.replyNotes[0]?.text === '已截取鼠标所在屏幕，请查收截图。' && await js(win, 'document.querySelector(".reply-note").textContent.includes("已截取鼠标所在屏幕")'));
+  await capture(win, 'caption-note.png');
   check('Notes restore after screenshot', win.isVisible());
   await js(win, 'document.querySelector("#tool-capture").dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true,button:2}))');
   check('Right click opens retained real screenshot result', await js(win, 'document.querySelector("#shared-panel").dataset.pane==="capture" && Boolean(document.querySelector(".capture-preview img"))'));
@@ -94,10 +98,11 @@ try {
     metadata = JSON.parse(page.content[0].text); receivedImages.push(...page.content.filter((c) => c.type === 'image'));
   }
   check('Native user completion returns real images to MCP client', !result.isError && receivedImages.length === 4 && result.content[0].text.includes('原生验收已完成'));
+  check('Auto-attached caption is merged into the final MCP reply', JSON.parse(result.content[0].text).result.reply === '原生验收已完成\n已截取鼠标所在屏幕，请查收截图。');
   const logs = JSON.parse((await client.callTool({ name: 'human_logs', arguments: {} })).content[0].text);
   const cached = logs.entries.find((entry) => entry.id === request.id);
   const cachedReply = JSON.parse(readFileSync(cached.cache.replyPath, 'utf8'));
-  check('Native reply is recoverable through logs and local image files without acknowledgement', cachedReply.reply === '原生验收已完成' && cachedReply.images.length === 4 && readFileSync(cachedReply.images[0].path).length > 100);
+  check('Native reply is recoverable through logs and local image files without acknowledgement', cachedReply.reply === JSON.parse(result.content[0].text).result.reply && cachedReply.images.length === 4 && readFileSync(cachedReply.images[0].path).length > 100);
   await capture(win, 'completed.png');
   win.setBounds({ ...win.getBounds(), x: win.getBounds().x - 30, width: 410, height: 390 }); await sleep(350);
   const remembered = JSON.parse(readFileSync(join(process.env.HUMAN_CLI_DATA_DIR, 'state.json'), 'utf8')).geometry.bounds;

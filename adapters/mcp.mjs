@@ -5,7 +5,7 @@ import { api } from './client.mjs';
 import { createSchema, updateSchema } from '../core/schemas.mjs';
 import { requestHuman, waitForHuman } from './human.mjs';
 
-const server = new McpServer({ name: 'human_cli', version: '1.1.0' });
+const server = new McpServer({ name: 'human_cli', version: '1.2.0' });
 const requestId = z.string().uuid();
 const text = (value) => ({ type: 'text', text: JSON.stringify(value, null, 2) });
 const register = (name, description, schema, handler) => server.registerTool(name, { description, inputSchema: schema }, async (input, extra) => {

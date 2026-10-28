@@ -16,7 +16,7 @@ export async function startApi(service) {
       const candidate = Buffer.from(req.headers.authorization?.replace(/^Bearer /, '') || '');
       fail(candidate.length === token.length && timingSafeEqual(candidate, Buffer.from(token)), 'E_AUTH', '需要本地访问令牌。', 401);
       const url = new URL(req.url, 'http://127.0.0.1');
-      if (req.method === 'GET' && url.pathname === '/health') return send(200, { name: 'human_cli', pid: process.pid, version: '1.1.0' });
+      if (req.method === 'GET' && url.pathname === '/health') return send(200, { name: 'human_cli', pid: process.pid, version: '1.2.0' });
       if (req.method === 'GET' && url.pathname === '/plugins') return send(200, service.plugins.list());
       if (req.method === 'GET' && url.pathname === '/logs') return send(200, service.logs({ limit: Number(url.searchParams.get('limit') || 50), offset: Number(url.searchParams.get('offset') || 0) }));
       if (req.method === 'GET' && url.pathname === '/requests') return send(200, service.list());

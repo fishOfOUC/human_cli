@@ -1,29 +1,21 @@
-# human_cli v1.1.0
+# human_cli v1.2.0
 
-修正默认交互：请求用户协助，就在同一次调用中等待用户答复。
+新增“截图并附言”功能扩展示例：截取鼠标所在屏幕，自动附上 PNG 和一句话，保持正在输入的草稿。
 
-## 用法
+## 使用
 
-```powershell
-.\human_cli.exe request .\resources\app\examples\request.json
-```
+完整解压 human_cli-v1.2.0-win32-x64.zip，无需安装 Node.js。
 
-便签显示后，命令持续等待，用户点击“完成并回复”才返回最终结果。无需再补调 wait，不设用户操作期限。
-
-MCP 的 human_request 同样默认等待并返回文字和图片。human_wait 用于断线后恢复等待或补取图片后续页。
-
-只有明确需要后台创建时才使用：
+把 resources/app/examples/plugins/cursor-capture-reply 复制到数据目录的 plugins 下，退出旧桌面端，再运行：
 
 ```powershell
-.\human_cli.exe request .\request.json --background
+.\human_cli.exe request .\resources\app\examples\cursor-capture-request.json
 ```
 
-MCP 对应 background: true。旧脚本若依赖立即返回创建结果，应加上此显式选项。
+左键右侧相机按钮执行，右键配置附言、等待和自动附入。附言显示在回复框下方，可移除，完成时合并到最终回复。命令默认等待用户完成。
 
-断线缓存、日志恢复、图片分页、网络 SPI、主题和窗口记忆继续保留。CLI 通过 stderr 输出 waiting_for_user 和请求位置，最终回复通过 stdout 返回。
+安装步骤见 [插件示例说明](https://github.com/fishOfOUC/human_cli/tree/main/examples/plugins/cursor-capture-reply)。
 
-验证：49 项核心与集成测试，27 项原生窗口验收，17 项打包 CLI/MCP EXE 验收。新增测试明确覆盖“用户没有打完字，调用不得提前结束”。
+SPI 结果新增可选 replyText 字段，任何语言的提供者均可使用；未返回该字段的旧插件保持兼容。重复运行同一工具更新自己的附言，图片满 8 张时明确报错。
 
-下载 human_cli-v1.1.0-win32-x64.zip 并完整解压，无需安装 Node.js。CLI 为 human_cli.exe，桌面端为 human_cli-desktop.exe，MCP 入口为 human_cli.exe mcp。
-
-完整说明：[README](https://github.com/fishOfOUC/human_cli#readme)。
+验证包含 54 项核心与集成测试、29 项原生窗口验收和 17 项打包 CLI/MCP EXE 验收。

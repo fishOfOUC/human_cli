@@ -67,7 +67,7 @@ AI 绑定示例：
 }
 ```
 
-human_cli 将网络附件解码、校验并保存在本机。插件结果每次最多 8 个附件、单个最多 5 MB，支持 PNG/JPEG/GIF/WebP 和纯文本。布尔配置项 autoAttach 可让图片自动加入回复；关闭后仍保留在工具结果中供选择处理。
+human_cli 将网络附件解码、校验并保存在本机。插件结果每次最多 8 个附件、单个最多 5 MB，支持 PNG/JPEG/GIF/WebP 和纯文本。布尔配置项 autoAttach 可让图片自动加入回复；若结果还含 replyText，则附言也加入回复。附言作为可移除的附件条保存，完成时合并进最终文字，不覆盖用户草稿；关闭后只保留工具结果。
 
 配置表单由 JSON Schema 生成；服务负责自己的业务逻辑和资源访问，human_cli 不要求自定义 HTML 或特定前端框架。
 
@@ -86,3 +86,7 @@ runId 由 human_cli 生成。相同 runId 重试 start 不得重复执行副作�
 此前的 manifest.json + plugin.mjs 插件继续作为兼容格式。把目录放进用户 plugins 下，它会由内置服务中的独立 Worker 适配成 SPI。`examples/plugins/clipboard-note` 保留为兼容示例。
 
 兼容 Worker 默认的 30 秒保护只针对这类旧插件的单次代码执行，与人类完成请求无关。Worker 是故障隔离，不是第三方 Node 代码的安全沙箱。新插件推荐直接实现网络 SPI，不需要采用这套旧格式。
+
+## 截图并附言示例
+
+[examples/plugins/cursor-capture-reply](../examples/plugins/cursor-capture-reply/README.md) 是可直接安装的本机能力插件。它由内置本机 SPI 提供者通过 Worker 适配，调用 screen.capture 选择 cursor，再返回图片及 replyText。网络 SPI 客户端使用同一结果约定；独立语言服务也可返回该字段。请求示例见 examples/cursor-capture-request.json。
