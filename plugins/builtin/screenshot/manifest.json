@@ -1,0 +1,10 @@
+{
+  "apiVersion": 1, "id": "human.screenshot", "version": "1.0.0", "name": "截取屏幕",
+  "description": "运行时暂时隐藏所有便签，截取选定屏幕，再恢复便签。", "icon": "scan-line", "side": "right", "entry": "plugin.mjs",
+  "permissions": ["screen.capture"],
+  "configSchema": { "type": "object", "additionalProperties": false, "properties": {
+    "display": { "type": "string", "title": "屏幕", "description": "primary、cursor 或显示器 ID", "default": "cursor" },
+    "delayMs": { "type": "integer", "title": "截图前等待（毫秒）", "minimum": 0, "maximum": 10000, "default": 500 },
+    "autoAttach": { "type": "boolean", "title": "自动附入回复", "default": true }
+  } }
+}

@@ -2,3 +2,17 @@ node_modules/
 dist/
 .qa/
 *.log
+release/
+.relay-data/
+
+.taste-skill/
+.env
+.env.*
+!.env.example
+/cache/
+/attachments/
+/state.json
+/runtime.json
+__pycache__/
+*.pyc
+.human-cli-data/

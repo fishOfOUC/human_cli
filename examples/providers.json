@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "providers": [
+    {
+      "id": "my-python-service",
+      "url": "http://127.0.0.1:7788/rpc",
+      "token": "替换为 Python 服务启动输出的 token",
+      "enabled": true
+    }
+  ]
+}

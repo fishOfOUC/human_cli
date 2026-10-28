@@ -1,0 +1,74 @@
+// Run with Node as a test driver. The tested CLI/MCP children have an empty PATH
+// and use only human_cli.exe plus the portable directory's bundled runtime.
+import { spawn } from 'node:child_process';
+import { mkdtempSync, readFileSync, writeFileSync, existsSync, symlinkSync } from 'node:fs';
+import { resolve, join } from 'node:path';
+import assert from 'node:assert/strict';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+
+const executable = resolve(process.argv[2] || '');
+assert.ok(executable.endsWith('human_cli.exe') && existsSync(executable), 'Pass packaged human_cli.exe path');
+const directory = mkdtempSync(resolve('.qa', 'cli-中文 空格-'));
+const alias = join(directory, '发布包 空格');
+symlinkSync(resolve(executable, '..'), alias, 'junction');
+const cli = join(alias, 'human_cli.exe');
+const environment = { ...process.env, PATH: '', HUMAN_CLI_DATA_DIR: join(directory, 'data'), HUMAN_CLI_NO_AUTOSTART: '0' };
+delete environment.HUMAN_CLI_DESKTOP_EXE;
+const checks = [], check = (name, condition) => { assert.ok(condition, name); checks.push(name); };
+const invoke = (args, input) => new Promise((resolveResult, reject) => {
+  const child = spawn(cli, args, { env: environment, windowsHide: true, stdio: 'pipe' });
+  let stdout = '', stderr = '';
+  child.stdout.setEncoding('utf8').on('data', (chunk) => { stdout += chunk; });
+  child.stderr.setEncoding('utf8').on('data', (chunk) => { stderr += chunk; });
+  child.once('error', reject); child.once('close', (code) => resolveResult({ code, stdout, stderr }));
+  child.stdin.on('error', () => {}); child.stdin.end(input);
+});
+const json = async (args, input) => { const result = await invoke(args, input); assert.equal(result.code, 0, result.stderr); return JSON.parse(result.stdout); };
+let runtime, client;
+try {
+  const help = await invoke(['--help']);
+  check('Native help exits successfully without starting desktop', help.code === 0 && help.stdout.includes('human_cli.exe') && !existsSync(join(environment.HUMAN_CLI_DATA_DIR, 'runtime.json')));
+  const invalid = await invoke(['invalid-command']);
+  check('Native errors use stderr and nonzero exit status', invalid.code === 1 && invalid.stdout === '' && invalid.stderr.includes('E_HUMAN_CLI'));
+  const plugins = await json(['plugins']);
+  check('EXE autostarts desktop with no node.exe in PATH', plugins.length === 4);
+  runtime = JSON.parse(readFileSync(join(environment.HUMAN_CLI_DATA_DIR, 'runtime.json'), 'utf8'));
+  const file = join(directory, '便签 请求.json');
+  writeFileSync(file, JSON.stringify({ title: 'EXE 文件请求：中文与空格', plugins: [] }));
+  const request = await json(['request', file]);
+  check('Unicode executable and JSON input paths work', request.title === 'EXE 文件请求：中文与空格');
+  const stdin = await json(['request', '-'], JSON.stringify({ title: '标准输入 "引号" \\ & $()', plugins: [] }));
+  check('UTF-8 stdin creates request without shell interpolation', stdin.title === '标准输入 "引号" \\ & $()');
+  check('Native get returns clean JSON on stdout', (await json(['get', request.id])).status === 'pending');
+  check('Native list contains created requests', (await json(['list'])).length === 2);
+  const logs = await json(['logs', '1', '0']);
+  check('Native logs paginate and locate readable cache', logs.total === 2 && logs.entries.length === 1 && JSON.parse(readFileSync(logs.entries[0].cache.requestPath, 'utf8')).id === logs.entries[0].id);
+  const result = await json(['result', request.id]);
+  check('Native result exposes state and cache location', result.result === null && result.cache.requestPath.endsWith('request.json'));
+  const waiting = json(['wait', request.id]);
+  let connected = false;
+  for (let attempt = 0; attempt < 30; attempt++) {
+    if ((await json(['get', request.id])).receiver.waiting) { connected = true; break; }
+    await new Promise((done) => setTimeout(done, 50));
+  }
+  assert.ok(connected, 'CLI wait connected');
+  const reason = '中文 "带引号" 与 \\ 结尾\\';
+  const cancelled = await json(['cancel', request.id, reason]);
+  check('Native argument quoting preserves quotes and backslashes', cancelled.cancelReason === reason);
+  check('Native wait returns when AI cancels', (await waiting).status === 'cancelled');
+  client = new Client({ name: 'native-exe-mcp-test', version: '1' });
+  await client.connect(new StdioClientTransport({ command: cli, args: ['mcp'], env: environment, stderr: 'pipe' }));
+  check('EXE mcp starts stdio server without system Node', (await client.listTools()).tools.length === 8);
+  const mcpLogs = await client.callTool({ name: 'human_logs', arguments: {} });
+  check('EXE mcp logs can recover CLI-created requests', JSON.parse(mcpLogs.content[0].text).entries.some((entry) => entry.id === request.id));
+  await client.close(); client = null;
+  writeFileSync(join(directory, 'acceptance.json'), JSON.stringify({ passed: checks.length, checks, executable, nodeAvailableInChildPath: false }, null, 2));
+  console.log(`PACKAGED CLI PASS ${checks.length} checks ${directory}`);
+} finally {
+  if (client) await client.close();
+  if (runtime) {
+    const health = await fetch(`${runtime.url}/health`, { headers: { Authorization: `Bearer ${runtime.token}` } }).catch(() => null);
+    if (health?.ok && (await health.json()).pid === runtime.pid) process.kill(runtime.pid);
+  }
+}

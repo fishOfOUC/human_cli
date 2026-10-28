@@ -1,0 +1,80 @@
+import { app, protocol, net, session, Tray, Menu, nativeImage, screen } from 'electron';
+import { dirname, join, resolve, relative, isAbsolute } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { mkdirSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
+import { dataDirectory, runtimePath } from '../core/paths.mjs';
+import { JsonStore } from '../core/store.mjs';
+import { AttachmentStore } from '../core/attachments.mjs';
+import { RequestService } from '../core/requests.mjs';
+import { PluginHost } from '../plugins/host.mjs';
+import { NetworkPluginHost, readProviders } from '../plugins/network-host.mjs';
+import { startSpiServer } from '../plugins/spi-server.mjs';
+import { startApi } from '../adapters/http.mjs';
+import { WindowManager } from './windows.mjs';
+import { createCapabilities } from './capabilities.mjs';
+import { registerIpc } from './ipc.mjs';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+app.setName('human_cli'); app.setPath('userData', dataDirectory());
+protocol.registerSchemesAsPrivileged([{ scheme: 'human-cli-app', privileges: { standard: true, secure: true, supportFetchAPI: true } }, { scheme: 'human-cli-asset', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
+export let ready;
+if (!app.requestSingleInstanceLock()) app.quit();
+else {
+  ready = app.whenReady().then(async () => {
+  const store = new JsonStore(dataDirectory()), attachments = new AttachmentStore(store), windows = new WindowManager(root, store);
+  const pluginDirectory = join(dataDirectory(), 'plugins'); mkdirSync(pluginDirectory, { recursive: true });
+  const legacy = new PluginHost([join(root, 'plugins', 'builtin'), pluginDirectory], createCapabilities(windows));
+  const builtinProvider = await startSpiServer({
+    plugins: () => legacy.list().map(({ entry, permissions, ...manifest }) => manifest),
+    execute: (id, context, options) => legacy.execute(id, { ...context, config: legacy.validateConfig(id, context.config) }, options),
+  });
+  const providerFile = join(pluginDirectory, 'providers.json');
+  if (!existsSync(providerFile)) writeFileSync(providerFile, JSON.stringify({ version: 1, providers: [] }, null, 2), { mode: 0o600 });
+  let configured = [], configError;
+  try { configured = readProviders(providerFile); } catch (error) { configError = { folder: 'providers.json', message: error.message }; }
+  const host = await new NetworkPluginHost([{ id: 'human.builtin', url: builtinProvider.url, token: builtinProvider.token }, ...configured]).initialize();
+  host.loadErrors.push(...legacy.loadErrors, ...(configError ? [configError] : []));
+  const service = new RequestService(store, attachments, host);
+  protocol.handle('human-cli-app', (request) => {
+    const url = new URL(request.url);
+    if (url.hostname !== 'ui') return new Response('Not found', { status: 404 });
+    const file = resolve(join(root, 'dist'), `.${decodeURIComponent(url.pathname)}`);
+    const rel = relative(join(root, 'dist'), file);
+    if (rel.startsWith('..') || isAbsolute(rel) || !existsSync(file)) return new Response('Not found', { status: 404 });
+    return net.fetch(pathToFileURL(file).href);
+  });
+  protocol.handle('human-cli-asset', (request) => {
+    try {
+      const url = new URL(request.url), id = url.pathname.slice(1);
+      if (url.hostname !== 'attachment' || !/^[a-f0-9-]{36}$/.test(id)) throw new Error();
+      const item = attachments.get(id);
+      return new Response(attachments.bytes(id), { headers: { 'Content-Type': item.mime, 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': 'human-cli-app://ui' } });
+    } catch { return new Response('Not found', { status: 404 }); }
+  });
+  session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => callback({ responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': ["default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' human-cli-asset: data:; connect-src 'self' human-cli-asset:; object-src 'none'; frame-src 'none'"] } }));
+  const ipc = registerIpc(service, windows, pluginDirectory), api = await startApi(service);
+  writeFileSync(runtimePath(), JSON.stringify({ url: api.url, token: api.token, pid: process.pid, version: '1.0.0' }), { mode: 0o600 });
+  const bitmap = Buffer.alloc(32 * 32 * 4);
+  for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
+    const offset = (y * 32 + x) * 4, paper = x >= 5 && x < 27 && y >= 3 && y < 29;
+    const line = paper && x >= 10 && x < 23 && [10, 11, 16, 17, 22, 23].includes(y);
+    bitmap.set(line ? [61, 83, 47, 255] : paper ? [185, 238, 255, 255] : [0, 0, 0, 0], offset);
+  }
+  const tray = new Tray(nativeImage.createFromBitmap(bitmap, { width: 32, height: 32 }));
+  tray.setToolTip('human_cli 接力便签');
+  const refreshTray = () => tray.setContextMenu(Menu.buildFromTemplate([
+    { label: 'human_cli · AI 协助便签', enabled: false },
+    ...service.list().filter((r) => r.status === 'pending').slice(0, 20).map((r) => ({ label: `${r.agent} · ${r.title.replace(/\n/g, ' ').slice(0, 36)}`, click: () => windows.open(r.id) })),
+    { label: '设置与请求记录', click: () => windows.open() }, { type: 'separator' }, { label: '退出 human_cli', click: () => app.quit() },
+  ]));
+  refreshTray(); tray.on('double-click', () => windows.open());
+  service.on('change', ({ id, event }) => { if (event === 'created') windows.open(id); refreshTray(); });
+  app.on('second-instance', () => windows.open());
+  for (const event of ['display-removed', 'display-added', 'display-metrics-changed']) screen.on(event, () => windows.displayChanged());
+  const pending = service.list().filter((r) => r.status === 'pending');
+  if (pending.length) for (const request of pending) windows.open(request.id); else windows.open();
+  app.on('window-all-closed', () => {});
+  app.on('before-quit', () => { windows.shutdown(); api.server.closeAllConnections(); api.server.close(); builtinProvider.server.closeAllConnections(); builtinProvider.server.close(); try { unlinkSync(runtimePath()); } catch {} tray.destroy(); });
+  });
+}

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Studio 外观设置 · Relay 演示目标页面</title>
+  <style>
+    :root{color-scheme:light;--bg:#f0f2e9;--ink:#30392b;--muted:#606b55;--line:#cad1be;--panel:#fafbf5}
+    :root.dark{color-scheme:dark;--bg:#242822;--ink:#e8eddf;--muted:#b0bda2;--line:#56624a;--panel:#2c3327}
+    *{box-sizing:border-box}body{font:14px/1.8 system-ui,'Microsoft YaHei',sans-serif;background:var(--bg);color:var(--ink);margin:0;padding:24px}
+    header{font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:12px;display:flex;justify-content:space-between}
+    main{max-width:420px;margin:30px auto}h1{font-size:25px;font-weight:550;margin:0 0 4px}p{color:var(--muted);margin:0 0 24px}
+    .themes{display:flex;gap:12px}button{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:14px 30px;cursor:pointer;flex:1}
+    button[aria-pressed=true]{border:2px solid #7d9665;padding:13px 29px}button:focus-visible{outline:2px solid #7d9665;outline-offset:4px}label{display:flex;justify-content:space-between;margin-top:25px}input{accent-color:#6b8654}small{display:block;color:var(--muted);font-size:12px;margin-top:30px}
+  </style>
+</head>
+<body>
+  <header><span>Studio / 设置 / 外观</span><span>Relay 示例页面</span></header>
+  <main><h1>外观</h1><p>让工作空间更合你的习惯。</p><div class="themes"><button data-theme="light">浅色</button><button data-theme="dark">深色</button></div><label>跟随系统强调色<input type="checkbox" checked /></label><small>这是侧栏工具直接打开的演示目标页面。原便签保持当前内页。</small></main>
+  <script>
+    function theme(value){document.documentElement.classList.toggle('dark',value==='dark');document.querySelectorAll('[data-theme]').forEach(button=>button.setAttribute('aria-pressed',button.dataset.theme===value));}
+    theme(new URLSearchParams(location.search).get('theme')==='dark'?'dark':'light');
+    document.querySelectorAll('[data-theme]').forEach(button=>button.addEventListener('click',()=>theme(button.dataset.theme)));
+  </script>
+</body>
+</html>

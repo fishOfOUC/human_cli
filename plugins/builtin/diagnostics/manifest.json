@@ -1,0 +1,5 @@
+{
+  "apiVersion": 1, "id": "human.diagnostics", "version": "1.0.0", "name": "采集环境", "description": "采集系统版本、显示器和 human_cli 状态，不收集其他进程数据。",
+  "icon": "terminal", "side": "right", "entry": "plugin.mjs", "permissions": ["system.info"],
+  "configSchema": { "type": "object", "additionalProperties": false, "properties": {} }
+}

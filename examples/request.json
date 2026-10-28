@@ -1,0 +1,11 @@
+{
+  "agent": "我的 AI", "project": "界面验收", "title": "帮我确认一下，\n深色界面是否正常。",
+  "description": "请切换到应用的外观设置页，亲眼检查显示效果。",
+  "steps": ["进入设置 → 外观", "切换深色，检查文字和按钮", "截图并告诉我有无错位"],
+  "context": "程序修改已完成，等待人工确认。", "expectation": "回复是否正常，有问题时附图说明。",
+  "plugins": [
+    { "id": "capture", "plugin": "human.screenshot", "side": "right", "config": { "display": "cursor", "autoAttach": true } },
+    { "id": "diagnostics", "plugin": "human.diagnostics", "side": "right", "config": {} },
+    { "id": "copy", "plugin": "human.clipboard", "side": "left", "config": { "text": "设置 → 外观" } }
+  ]
+}

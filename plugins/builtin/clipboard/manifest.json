@@ -1,0 +1,7 @@
+{
+  "apiVersion": 1, "id": "human.clipboard", "version": "1.0.0", "name": "复制内容", "description": "将请求中的指定内容写入剪贴板。",
+  "icon": "copy", "side": "left", "entry": "plugin.mjs", "permissions": ["clipboard.write"],
+  "configSchema": { "type": "object", "additionalProperties": false, "required": ["text"], "properties": {
+    "text": { "type": "string", "title": "要复制的内容", "maxLength": 30000 }
+  } }
+}

@@ -1,54 +1,173 @@
-# Relay · 接力便签
+# human_cli
 
-灵感来自餐馆前台递给后厨的便签：Agent 在需要人协助时递出任务，人完成操作后把说明、图片和诊断信息一起递回去。
+**把用户包装成可调用的工具，配合 AI 完成工作。**
 
-这是可交互的前端设计 Demo，代码与示例数据均在本项目中。
+AI 不方便继续操作时，例如需要人工验证、登录、观察真实界面或截图确认，可以调用 human_cli，把任务交给用户。用户收到一张小型置顶便签，完成操作后附上文字、图片或诊断，再把结果返回给 AI。
 
-## 启动
+AI 负责创建、更新和取消任务；用户负责需要人参与的那一步。关闭便签只会收起，不会取消任务，用户操作也没有固定完成时限。
 
-Windows 双击 **启动 Demo.cmd**，或在本目录运行：
+## 下载与启动
+
+从 [GitHub Releases](https://github.com/fishOfOUC/human_cli/releases/latest) 下载 Windows x64 便携包，解压整个目录。
+
+- `human_cli.exe`：CLI 和 MCP 入口，供 AI 或终端调用。
+- `human_cli-desktop.exe`：桌面便签和托盘入口，也会被 CLI 自动启动。
+
+**用户无需安装 Node.js。** 两个 EXE、resources 和其他运行库必须放在同一目录，不能只复制一个 EXE。
+
+## 用 CLI 把一项工作交给用户
+
+在便携包目录中打开 PowerShell，先检查可用功能：
 
 ```powershell
-npm install
-npm run dev -- --port 5173
+.\human_cli.exe --help
+.\human_cli.exe plugins
 ```
 
-打开 http://127.0.0.1:5173 。`npm run build` 生成 `dist/`，`npm run preview` 可预览构建产物。
+创建一个 UTF-8 的 `request.json`：
 
-## 可以体验
+```json
+{
+  "title": "请帮我确认深色界面",
+  "agent": "我的 AI",
+  "description": "我已经完成修改，请打开应用的外观设置页检查实际效果。",
+  "steps": ["进入设置 → 外观", "切换深色，检查文字和按钮", "截图并回复是否正常"],
+  "expectation": "有问题时附图说明。",
+  "plugins": [{
+    "id": "capture",
+    "plugin": "human.screenshot",
+    "side": "right",
+    "config": {"display": "primary", "autoAttach": true}
+  }]
+}
+```
 
-- 三种便签：界面验收、人机验证、数据采集。切换场景保留各自的内存草稿。
-- 标题栏拖动、右下角缩放；位置与尺寸保存到 localStorage，新便签和刷新后沿用。浏览器可视区域变小时自动限制位置和尺寸。
-- 任务清单、Agent 上下文、仅标记完成、带回复完成；Ctrl + Enter 完成并回复。
-- 图片文件上传、剪贴板图片粘贴、拖放、移除和放大预览。每张便签最多 8 张，单张最大 5 MB。
-- 左右两侧自定义工具：名称、说明、挂载位置、演示运行结果。
-- 工具以颜色和文字共同显示待运行、运行中、成功和出错。
-- 错误可复制，也可一键作为独立诊断附件加入回复。附件保留完整错误，重复点击不重复添加。
-- 完成后查看回传内容，导出含 request_id、文字、图片 data URL 和诊断的 JSON。完成结果是快照，异步工具不会修改已经完成的回复。
-- 收起、关闭、重新打开便签；关闭保留本次页面会话中的草稿。
+提交后等待用户完成：
 
-“新便签”替换当前场景的演示便签；有未发送内容时会提示。刷新只恢复窗口几何信息，不保存回复或图片。
+```powershell
+$request = .\human_cli.exe request .\request.json | ConvertFrom-Json
+.\human_cli.exe wait $request.id
+```
 
-## 演示边界
+也可以直接运行包内示例：
 
-这是浏览器内模拟的桌面便签窗口，尚未连接 MCP / Agent、原生窗口管理、操作系统截图、脚本执行或采集服务。
+```powershell
+.\human_cli.exe request .\resources\app\examples\request.json
+```
 
-“已置顶”是可切换的界面状态。“截取画面”生成明确标注的示例界面图片。诊断工具故意展示连接失败，以体验错误处理；不会请求本机 9222 端口。自定义工具只演示状态流转，不执行用户脚本。“完成”生成本地结果，不向真实 Agent 发送消息。
+| 命令 | 用途 |
+| --- | --- |
+| `request <file.json>` | 创建协助便签，返回 ID 和版本 |
+| `request -` | 从标准输入读取 UTF-8 JSON |
+| `wait <ID>` | 等待用户完成或 AI 取消，不设用户操作时限 |
+| `get <ID>` | 即时查询状态、草稿和工具结果 |
+| `result <ID>` | 获取最终回复，图片以 Base64 返回 |
+| `logs [limit] [offset]` | 按创建时间倒序查询便签标题、时间、状态及缓存绝对路径 |
+| `list` | 列出请求 |
+| `cancel <ID> [原因]` | 由 AI 取消尚未完成的请求 |
+| `plugins` | 查询可挂载的侧栏插件及配置 Schema |
+| `mcp` | 启动 MCP stdio 服务 |
 
-按需求以桌面界面为设计目标，未做移动端适配。
+成功结果写入 stdout，格式为 UTF-8 JSON；错误写入 stderr，并返回非零退出码。帮助输出为文本。更新说明目前通过 MCP 的 human_update 提供。
 
-## 后续桌面端窗口恢复
+## MCP 接入
 
-当前仅处理浏览器可视区域。真正接入 Electron / Tauri / 原生窗口时，应保存窗口正常状态的 bounds、显示器标识、工作区与 DPI。重新打开时优先恢复原显示器，若断开则选取与旧窗口交集最大的现有工作区；完全无交集时迁回主屏。按当前 DPI 转换坐标，限制大小，将标题栏和窗口操作区保持在工作区内；监听显示器拔插再次校正。关闭或最小化的临时尺寸不覆盖正常窗口尺寸。
+在支持 MCP 的 AI 客户端中配置，替换为实际解压路径：
 
-## 文件
+```json
+{
+  "mcpServers": {
+    "human_cli": {
+      "command": "C:/Tools/human_cli/human_cli.exe",
+      "args": ["mcp"]
+    }
+  }
+}
+```
 
-- `src/main.js`：界面、工具状态、图片与完成流程。
-- `src/data.js`：三个示例场景和默认工具。
-- `src/window.js`：窗口拖动、缩放、存储和可视区域校正。
-- `src/style.css`：视觉样式。
-- `.taste-skill/`：设计方向与浏览器视觉检查记录。
+AI 先调用 `human_plugins` 查询功能，再调用 `human_request` 创建任务，使用 `human_wait` 等待用户。接口还包括 human_get、human_update、human_cancel、human_list 和 human_logs，共 8 个工具。MCP 的大图片分批返回，按 imagePage.nextOffset 继续读取；不需要额外发送接收回执。
 
-## 验证
+完整参数、图片分页和恢复流程见 [AI 接入说明](docs/AI-INTEGRATION.md)。
 
-已完成生产构建、1440 × 900 浏览器视觉检查及 26 项浏览器交互检查；覆盖图片上传 / 粘贴 / 拖入、错误附入与去重、自定义工具运行、完成快照和 JSON、窗口拖动 / 缩放 / 刷新恢复 / 越界校正。没有验证原生置顶、实际显示器拔插或真实 Agent 通信。
+## 断线与 AI 重启
+
+便签、回复和附件统一保存在本地。AI 工具调用超时或退出，不会取消用户的任务；用户完成后，界面只显示“回复已保存”。AI 重启后调用日志接口：
+
+```powershell
+.\human_cli.exe logs 50 0
+```
+
+按标题和时间找到目标便签，读取 cache.replyPath 指向的回复 JSON，图片位置在 images[].path。无需记住原来的请求 ID。没有回复时 replyPath 为 null，请先查看请求状态。
+
+默认位置：
+
+```text
+%LOCALAPPDATA%/human_cli/
+  state.json
+  cache/<requestId>/
+    request.json
+    reply.json
+    attachments/
+  plugins/providers.json
+```
+
+HUMAN_CLI_DATA_DIR 可覆盖数据目录。为保留改名前的数据，如果新目录尚无状态且旧 RelayNote 目录存在状态，会继续使用旧目录；旧 RELAY_DATA_DIR 也作为兼容配置接受。升级前应退出旧桌面端。读取不删除缓存；用户可以明确丢弃回复，删除回复文件及无引用图片，保留任务记录与独立工具结果。
+
+## 用户如何操作便签
+
+- 默认纸面约 320 × 360 DIP，两侧各 30 DIP 书签，不占满屏幕。
+- **左键侧栏按钮直接执行工具；右键打开共用的配置与结果页。** 执行不会强制切换当前页。
+- 灰 / 蓝 / 绿 / 红按钮分别表示待运行 / 运行中 / 成功 / 出错。完整错误可以复制、附到回复或保存为文本。
+- 图片支持上传、粘贴、拖入及预览，每项请求最多 8 张，每张不超过 5 MB。截图时临时隐藏便签，完成后恢复。
+- Ctrl+Enter 完成并回复；侧栏支持 Enter / 空格执行、Shift+F10 查看详情。
+- 拖动标题栏移动，右下角调整大小；下一张便签记住位置和尺寸。原显示器断开时，窗口恢复到可用工作区。
+- 纸黄、雾绿、浅色、深色四种主题可以切换，所有便签同步并记住偏好。
+- 关闭仅收起；托盘可以重新打开便签。AI 创建、更新、取消任务，不提供用户创建新任务的入口。
+
+## 网络 SPI 插件
+
+侧栏功能通过 **HTTP + JSON-RPC 2.0 网络 SPI** 接入。提供者可以用 Python、Java、C#、Go、Node 等语言实现，不需要把插件代码加载到便签进程。
+
+内置插件是 human.screenshot、human.open-url、human.clipboard、human.diagnostics，同样经过本机 SPI。外部提供者在数据目录的 plugins/providers.json 登记地址和 token，重启后发现。
+
+仓库附有纯 Python 标准库示例：
+
+```powershell
+python examples/spi-python/provider.py --port 7788
+```
+
+将输出的 URL 与 token 填入 providers.json，再由 AI 把 example.python-note 绑定到便签。服务端实现 describe / start / status / cancel / forget，返回文字、图片或错误；前端共用配置和结果界面。
+
+参阅 [插件开发](docs/PLUGINS.md)、[SPI 协议](docs/SPI.md) 和 [架构说明](docs/ARCHITECTURE.md)。远程提供者操作的是其所在机器资源，本机屏幕等能力需要本机提供者。
+
+## 从源码运行与构建
+
+开发环境需要 Node.js 22.12 或更新版本；Windows 发布包构建另需 MinGW-w64 GCC，可通过 HUMAN_CLI_CC 指定编译器路径。
+
+```powershell
+git clone https://github.com/fishOfOUC/human_cli.git
+cd human_cli
+npm ci
+npm start
+```
+
+源码 CLI / MCP 开发入口分别为 node adapters/cli.mjs 与 node adapters/mcp.mjs，也可双击“启动 human_cli.cmd”。打包：
+
+```powershell
+npm test
+npm run package
+```
+
+产物目录见 release/latest.json。native Windows CLI 启动器复用包内运行时，开发依赖不需要交给使用者。
+
+## 验证范围
+
+通过 45 项核心与集成测试、25 项 Windows 原生便签验收，以及 13 项打包 CLI/MCP EXE 验收。包含真实截图、图片回传、断线恢复、日志路径、旧数据兼容、网络 SPI、主题、窗口记忆，以及清空子进程 PATH 后的 EXE 运行。详细记录见 [验证说明](docs/VERIFICATION.md)。
+
+```powershell
+npm test
+npm run build
+npm run test:native  # 会启动测试窗口并进行一次真实屏幕截图
+```
+
+当前发行针对 Windows x64、本机单用户 AI 通道；实际多显示器硬件拔插仍需现场验收。没有外部服务自动安装、插件热重载、历史自动过期或自动更新；旧 Node Worker 兼容层不构成安全沙箱。原型快照保存在 prototype/，保留原命名，不进入正式发布包。
