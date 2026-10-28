@@ -54,7 +54,7 @@ else {
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => callback({ responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': ["default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' human-cli-asset: data:; connect-src 'self' human-cli-asset:; object-src 'none'; frame-src 'none'"] } }));
   const ipc = registerIpc(service, windows, pluginDirectory), api = await startApi(service);
-  writeFileSync(runtimePath(), JSON.stringify({ url: api.url, token: api.token, pid: process.pid, version: '1.0.0' }), { mode: 0o600 });
+  writeFileSync(runtimePath(), JSON.stringify({ url: api.url, token: api.token, pid: process.pid, version: '1.1.0' }), { mode: 0o600 });
   const bitmap = Buffer.alloc(32 * 32 * 4);
   for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
     const offset = (y * 32 + x) * 4, paper = x >= 5 && x < 27 && y >= 3 && y < 29;

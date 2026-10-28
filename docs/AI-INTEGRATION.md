@@ -24,8 +24,8 @@ human_cli 不设置用户完成协助的截止时间。用户长时间离开、�
 | 工具 | 用途 |
 | --- | --- |
 | `human_plugins` | 查询 SPI 插件及配置 Schema |
-| `human_request` | AI 创建便签，返回 ID 和版本；支持幂等键 |
-| `human_wait` | 等待用户完成，或取回已完成回复；支持图片分页 |
+| `human_request` | 请求用户协助，默认等待并返回最终文字和图片；支持幂等键 |
+| `human_wait` | 恢复已有请求的等待，或补取图片后续页 |
 | `human_logs` | 按便签创建时间倒序查询标题、时间、状态及本地缓存绝对路径 |
 | `human_get` | 即时查询指定请求及草稿、结果 |
 | `human_update` | 携带版本更新 pending 请求 |
@@ -34,13 +34,15 @@ human_cli 不设置用户完成协助的截止时间。用户长时间离开、�
 
 ## 正常调用
 
-1. 查询插件，调用 `human_request`，取得 requestId。
-2. 调用 `human_wait({ requestId })`，等待用户完成或 AI 取消，不设用户操作期限。
-3. 收取文字、诊断和 image 内容块；若 `imagePage.nextOffset` 非 null，用该值作为 imageOffset 继续调用，直到取完图片。
+1. 查询插件，调用 human_request。
+2. 同一次调用会显示便签并等待用户完成或 AI 取消，不设用户操作期限。用户打字、保存草稿或收起窗口都不会结束调用。
+3. 调用直接返回文字、诊断和 image 内容块。若 imagePage.nextOffset 非 null，用 human_wait({ requestId, imageOffset }) 补取后续图片页。
+
+只有明确需要后台任务时才设置 background: true，此时 human_request 立即返回请求 ID；之后可用 human_wait 恢复等待。默认 background 为 false。
 
 收到结果后即可继续自己的工作，无需确认收到。回复统一保留到本地缓存，界面显示“回复已保存”，不维护待交付、已读或交付回执状态。
 
-`human_wait` 不提供 timeoutMs。客户端宿主可以有自己的超时；连接断开只撤销本次等待监听，不取消便签或删除内容。
+human_request 和 human_wait 都不提供用户完成超时参数。客户端宿主可以有自己的超时；连接断开只撤销本次等待监听，不取消便签或删除内容。
 
 ## AI 重启后的恢复
 
@@ -97,12 +99,12 @@ AI 根据标题和时间找到原便签，直接读取 replyPath；其中的 ima
 
 ```powershell
 ./human_cli.exe request ./resources/app/examples/request.json
-./human_cli.exe wait <请求ID>
+# 这一条命令默认等到用户完成，再返回回复。
 ./human_cli.exe logs 50 0
 ./human_cli.exe result <请求ID>
 ```
 
-还支持 get、cancel、list、plugins；--help 显示用法。request - 从标准输入读取 UTF-8 JSON，输出写入 stdout，错误写入 stderr 并返回非零退出码。
+CLI request 默认等待用户完成；只有 --background 明确后台创建并立即返回 ID。wait <ID> 用于恢复等待已有任务。还支持 get、cancel、list、plugins；--help 显示用法。request - 从标准输入读取 UTF-8 JSON，最终输出写入 stdout，等待开始的 waiting_for_user 元数据和错误写入 stderr；错误返回非零退出码。
 
 HTTP 接口为 `GET /logs?limit=50&offset=0`，使用现有本机 Bearer 认证。日志接口不读取调用者指定的任意路径，仅返回工具管理的缓存位置。
 

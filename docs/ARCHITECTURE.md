@@ -49,6 +49,8 @@ human_logs / GET /logs 按创建时间倒序返回标题、时间、状态和缓
 
 用户可明确丢弃缓存回复，删除 reply.json、回复文字和诊断，以及不再被独立工具结果引用的图片。请求日志和独立工具结果保留，标记 discarded；丢弃不冒充 AI 取消，也不能撤回此前已被读取的内容。
 
+adapters/human.mjs 统一 CLI 与 MCP 的协助语义：request/human_request 默认创建后等待最终回复。后台创建是显式选项，CLI 为 --background，MCP 为 background: true。human_wait 用于恢复或补取图片，不是正常请求的必需第二步。
+
 请求不设用户完成期限。human_wait 等到用户完成或 AI 取消；连接断开只清理监听。MCP 宿主可能有自己的超时，AI 可重新连接读取缓存日志，或通过原 requestId 再次取回。大图片仍分页回传。
 
 AI 更新说明增加 version，用户完成携带看到的版本；idempotencyKey 避免重试创建重复窗口。AI 更新/取消或用户完成会尽力停止相应插件作业，后到结果不能污染已完成回复快照。

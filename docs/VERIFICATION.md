@@ -2,9 +2,11 @@
 
 ## 核心与协议
 
-`npm test`：45 项通过。
+`npm test`：49 项通过。
 
 覆盖请求参数、幂等重试、AI 版本更新、过期完成拒绝、完整错误附件、图片签名与大小、8 图上限、结果快照、等待与取消、监听器回收、运行防重、后台结果不污染完成回复、偏好与重启恢复。
+
+新增默认行为回归：CLI request 和 MCP human_request 在同一次调用内创建、等待并返回回复。用户仍在打字时 stdout 无完成输出，进程/工具调用不结束；点击完成后返回最终文字和图片。后台创建必须显式选择，拼错参数不会悄悄改变行为。默认请求中途断线仍可从日志恢复。真实 Electron 中也验证默认 CLI 请求经过输入、草稿持久化及完成按钮，才返回回复。
 
 新增验证：用户等待不创建期限定时器，模拟一天离开仍保留请求。真实 MCP 客户端超时、断开后，新客户端调用 human_logs，不依赖原 requestId 就能找到回复文件，自行读取 UTF-8 文字及原始图片。无需回执，工具目录不含 human_ack。
 
@@ -30,7 +32,7 @@
 
 测试只操作 human_cli 自己的 DOM 和窗口，不发送全局鼠标或键盘输入；会进行一次真实屏幕截图。生成的报告与截图保存在忽略的 `.qa/native-*/` 下，测试截图不进入发布包或 Git。
 
-真实 Windows 原生验收：25 项通过，最新报告为 `.qa/native-13e408e3/report.json`。包含真实屏幕 PNG 采集、截图时便签隐藏与恢复、通过正式界面的图片上传 / 粘贴 / 拖入处理器传入真实 IPC、MCP 客户端分页收到四个 image 内容块、日志路径可直接读取回复及图片、断线回复只显示已保存、丢弃确认可放弃、丢弃后只向 AI 返回标记，以及原生置顶、主题同步与持久化、位置尺寸恢复、收起不取消、AI 取消和无 renderer 错误。
+真实 Windows 原生验收：27 项通过，最新报告为 `.qa/native-33c8da5d/report.json`。包含真实屏幕 PNG 采集、截图时便签隐藏与恢复、通过正式界面的图片上传 / 粘贴 / 拖入处理器传入真实 IPC、MCP 客户端分页收到四个 image 内容块、日志路径可直接读取回复及图片、断线回复只显示已保存、丢弃确认可放弃、丢弃后只向 AI 返回标记，以及原生置顶、主题同步与持久化、位置尺寸恢复、收起不取消、AI 取消和无 renderer 错误。
 
 缓存回复与已丢弃窗口截图保存在同目录，已检查紧凑便签内的文字及操作布局。
 
@@ -42,6 +44,6 @@ Windows 在 125% 缩放下的物理像素 / DIP 取整会造成少量尺寸偏�
 
 Windows x64 便携包使用真实 MCP 客户端调用包内适配器，自动启动打包后的 `human_cli-desktop.exe`，通过网络 SPI 查询到 4 个内置插件，并完成创建 / 即时查询 pending / AI 取消 / 日志定位缓存文件，未手动提前打开桌面端。对应验收脚本为 `tests/autostart-smoke.mjs`；结果写入 `.qa/autostart-*/acceptance.json`。每次更新打包后运行此检查，并对 core、desktop、plugins、adapters、dist、docs、examples 与包内文件做 SHA256 一致性核对。
 
-原生 EXE 入口验收通过 13 项，脚本为 tests/packaged-cli-smoke.mjs，更名后的报告为 `.qa/cli-中文 空格-xGa1TJ/acceptance.json`：清空子进程 PATH，在含中文和空格的发布路径运行帮助、错误退出码、JSON 文件/标准输入、get/list/logs/result、wait/cancel、参数引号和反斜杠，并通过 human_cli.exe mcp 连接真实 MCP SDK。测试驱动本身使用 Node，受测 CLI/MCP 不依赖系统 Node。
+原生 EXE 入口验收通过 17 项，脚本为 tests/packaged-cli-smoke.mjs，v1.1.0 报告为 `.qa/cli-中文 空格-cCvspu/acceptance.json`：清空子进程 PATH，在含中文和空格的发布路径运行帮助、错误退出码、JSON 文件/标准输入、get/list/logs/result、wait/cancel、参数引号和反斜杠，并通过 human_cli.exe mcp 连接真实 MCP SDK。测试驱动本身使用 Node，受测 CLI/MCP 不依赖系统 Node。
 
 另在实际 PowerShell 中验证 EXE 输出可通过 ConvertFrom-Json 管道解析，成功返回 0、未知命令返回 1。启动器导入表仅依赖 Windows 自带 KERNEL32.dll、msvcrt.dll。

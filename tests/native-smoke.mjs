@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 import { once } from 'node:events';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { spawn } from 'node:child_process';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
@@ -20,7 +21,7 @@ async function until(fn, timeout = 15000) {
   throw new Error('Native acceptance timed out');
 }
 async function ready(win) { if (win.webContents.isLoading()) await once(win.webContents, 'did-finish-load'); await until(() => win.webContents.executeJavaScript('Boolean(document.querySelector("h1"))')); }
-let client;
+let client, cliProcess;
 async function runAcceptance() {
 try {
   const desktop = await import('../desktop/main.mjs');
@@ -128,12 +129,27 @@ try {
   const discardedResult = await client.callTool({ name: 'human_wait', arguments: { requestId: offline.id } });
   check('AI receives only discarded marker after user discards queued reply', JSON.parse(discardedResult.content[0].text).status === 'reply_discarded' && !JSON.stringify(discardedResult).includes('先保存在本机'));
   await capture(offlineWin, 'discarded.png');
+  let cliClosed = false, cliOutput = '', cliError = '';
+  cliProcess = spawn(process.execPath, [resolve('adapters/cli.mjs'), 'request', '-'], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', HUMAN_CLI_NO_AUTOSTART: '1' }, stdio: 'pipe' });
+  cliProcess.stdout.setEncoding('utf8').on('data', (chunk) => { cliOutput += chunk; });
+  cliProcess.stderr.setEncoding('utf8').on('data', (chunk) => { cliError += chunk; });
+  const cliFinished = new Promise((resolveResult, reject) => { cliProcess.once('error', reject); cliProcess.once('close', (code) => { cliClosed = true; resolveResult(code); }); });
+  cliProcess.stdin.end(JSON.stringify({ title: '单次 CLI 协助验收', plugins: [] }));
+  const blocking = await until(async () => (await api('/requests')).find((entry) => entry.title === '单次 CLI 协助验收'));
+  const blockingWin = await until(() => BrowserWindow.getAllWindows().find((w) => w.requestId === blocking.id)); await ready(blockingWin);
+  await until(async () => (await api(`/requests/${blocking.id}`)).receiver.waiting);
+  await js(blockingWin, 'document.querySelector("#reply").value="还没打完";document.querySelector("#reply").dispatchEvent(new Event("input",{bubbles:true}))');
+  await until(async () => (await api(`/requests/${blocking.id}`)).reply === '还没打完');
+  check('Single CLI request remains active while native user is still drafting', !cliClosed && cliOutput === '');
+  await js(blockingWin, 'document.querySelector("#reply").value="我已验收";document.querySelector("#reply").dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("[data-action=complete]").click()');
+  const cliCode = await cliFinished, cliResult = JSON.parse(cliOutput);
+  check('Native completion returns reply to the same CLI request without a second wait call', cliCode === 0 && cliResult.status === 'completed' && cliResult.result.reply === '我已验收' && cliError.includes('waiting_for_user'));
   check('No native renderer errors', errors.length === 0);
   writeFileSync(join(output, 'report.json'), JSON.stringify({ passed: checks.length, checks, errors }, null, 2));
   console.log(`NATIVE REPORT ${join(output, 'report.json')}`);
 } catch (error) {
   console.error(error); process.exitCode = 1;
   writeFileSync(join(output, 'failure.json'), JSON.stringify({ checks, error: error.stack, errors }, null, 2));
-} finally { if (client) await client.close(); if (process.exitCode) app.once('will-quit', () => app.exit(process.exitCode)); app.quit(); }
+} finally { if (client) await client.close(); if (cliProcess && cliProcess.exitCode === null) cliProcess.kill(); if (process.exitCode) app.once('will-quit', () => app.exit(process.exitCode)); app.quit(); }
 }
 void runAcceptance();

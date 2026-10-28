@@ -36,9 +36,9 @@ try {
   runtime = JSON.parse(readFileSync(join(environment.HUMAN_CLI_DATA_DIR, 'runtime.json'), 'utf8'));
   const file = join(directory, '便签 请求.json');
   writeFileSync(file, JSON.stringify({ title: 'EXE 文件请求：中文与空格', plugins: [] }));
-  const request = await json(['request', file]);
+  const request = await json(['request', file, '--background']);
   check('Unicode executable and JSON input paths work', request.title === 'EXE 文件请求：中文与空格');
-  const stdin = await json(['request', '-'], JSON.stringify({ title: '标准输入 "引号" \\ & $()', plugins: [] }));
+  const stdin = await json(['request', '-', '--background'], JSON.stringify({ title: '标准输入 "引号" \\ & $()', plugins: [] }));
   check('UTF-8 stdin creates request without shell interpolation', stdin.title === '标准输入 "引号" \\ & $()');
   check('Native get returns clean JSON on stdout', (await json(['get', request.id])).status === 'pending');
   check('Native list contains created requests', (await json(['list'])).length === 2);
@@ -57,9 +57,31 @@ try {
   const cancelled = await json(['cancel', request.id, reason]);
   check('Native argument quoting preserves quotes and backslashes', cancelled.cancelReason === reason);
   check('Native wait returns when AI cancels', (await waiting).status === 'cancelled');
+  let normalSettled = false;
+  const normal = json(['request', '-'], JSON.stringify({ title: '默认请求应等待用户', plugins: [] })).then((value) => { normalSettled = true; return value; });
+  let normalRequest;
+  for (let attempt = 0; attempt < 30; attempt++) {
+    normalRequest = (await json(['list'])).find((entry) => entry.title === '默认请求应等待用户');
+    if (normalRequest && (await json(['get', normalRequest.id])).receiver.waiting) break;
+    await new Promise((done) => setTimeout(done, 50));
+  }
+  check('Native request defaults to awaiting the human instead of returning creation', Boolean(normalRequest) && !normalSettled && (await json(['get', normalRequest.id])).receiver.waiting);
+  await json(['cancel', normalRequest.id, '测试中断等待']);
+  check('Native request returns final cancellation in the same call', (await normal).status === 'cancelled');
   client = new Client({ name: 'native-exe-mcp-test', version: '1' });
   await client.connect(new StdioClientTransport({ command: cli, args: ['mcp'], env: environment, stderr: 'pipe' }));
   check('EXE mcp starts stdio server without system Node', (await client.listTools()).tools.length === 8);
+  let mcpSettled = false;
+  const mcpRequest = client.callTool({ name: 'human_request', arguments: { title: 'MCP 默认等待验收', plugins: [] } }).then((value) => { mcpSettled = true; return value; });
+  let mcpId;
+  for (let attempt = 0; attempt < 30; attempt++) {
+    mcpId = (await json(['list'])).find((entry) => entry.title === 'MCP 默认等待验收')?.id;
+    if (mcpId && (await json(['get', mcpId])).receiver.waiting) break;
+    await new Promise((done) => setTimeout(done, 50));
+  }
+  check('EXE MCP request also waits by default', Boolean(mcpId) && !mcpSettled && (await json(['get', mcpId])).receiver.waiting);
+  await json(['cancel', mcpId, '测试结束']);
+  check('EXE MCP request returns final state in the same call', JSON.parse((await mcpRequest).content[0].text).status === 'cancelled');
   const mcpLogs = await client.callTool({ name: 'human_logs', arguments: {} });
   check('EXE mcp logs can recover CLI-created requests', JSON.parse(mcpLogs.content[0].text).entries.some((entry) => entry.id === request.id));
   await client.close(); client = null;

@@ -42,12 +42,13 @@ AI 负责创建、更新和取消任务；用户负责需要人参与的那一�
 }
 ```
 
-提交后等待用户完成：
+用一次调用请求协助并等待答复：
 
 ```powershell
-$request = .\human_cli.exe request .\request.json | ConvertFrom-Json
-.\human_cli.exe wait $request.id
+.\human_cli.exe request .\request.json
 ```
+
+这条命令会一直等待用户点击“完成并回复”，然后返回最终结果；用户还在输入时不会结束。正常使用不需要另调 wait。
 
 也可以直接运行包内示例：
 
@@ -57,9 +58,10 @@ $request = .\human_cli.exe request .\request.json | ConvertFrom-Json
 
 | 命令 | 用途 |
 | --- | --- |
-| `request <file.json>` | 创建协助便签，返回 ID 和版本 |
-| `request -` | 从标准输入读取 UTF-8 JSON |
-| `wait <ID>` | 等待用户完成或 AI 取消，不设用户操作时限 |
+| `request <file.json>` | 请求用户协助，默认等到完成后返回回复 |
+| `request -` | 从标准输入读取 UTF-8 JSON，同样默认等待回复 |
+| `request <file.json> --background` | 明确后台创建，立即返回便签 ID |
+| `wait <ID>` | 恢复等待已有便签，例如断线后或后台模式 |
 | `get <ID>` | 即时查询状态、草稿和工具结果 |
 | `result <ID>` | 获取最终回复，图片以 Base64 返回 |
 | `logs [limit] [offset]` | 按创建时间倒序查询便签标题、时间、状态及缓存绝对路径 |
@@ -68,7 +70,9 @@ $request = .\human_cli.exe request .\request.json | ConvertFrom-Json
 | `plugins` | 查询可挂载的侧栏插件及配置 Schema |
 | `mcp` | 启动 MCP stdio 服务 |
 
-成功结果写入 stdout，格式为 UTF-8 JSON；错误写入 stderr，并返回非零退出码。帮助输出为文本。更新说明目前通过 MCP 的 human_update 提供。
+最终结果写入 stdout，格式为 UTF-8 JSON。等待开始时，stderr 输出 waiting_for_user 及请求 ID、缓存位置，便于中断后恢复；错误也写入 stderr，并返回非零退出码。帮助输出为文本。更新说明目前通过 MCP 的 human_update 提供。
+
+仅需要后台模式时显式指定 --background，再用 wait 等待已有任务；正常请求无需拆成两步。
 
 ## MCP 接入
 
@@ -85,7 +89,7 @@ $request = .\human_cli.exe request .\request.json | ConvertFrom-Json
 }
 ```
 
-AI 先调用 `human_plugins` 查询功能，再调用 `human_request` 创建任务，使用 `human_wait` 等待用户。接口还包括 human_get、human_update、human_cancel、human_list 和 human_logs，共 8 个工具。MCP 的大图片分批返回，按 imagePage.nextOffset 继续读取；不需要额外发送接收回执。
+AI 先调用 `human_plugins` 查询功能，再调用 `human_request` 请求用户协助；同一次调用会等待并返回回复，无需另调 human_wait。只有需要后台创建时才指定 background: true。接口还包括 human_get、human_update、human_cancel、human_list 和 human_logs，共 8 个工具。MCP 的大图片分批返回，按 imagePage.nextOffset 继续读取；不需要额外发送接收回执。
 
 完整参数、图片分页和恢复流程见 [AI 接入说明](docs/AI-INTEGRATION.md)。
 
@@ -162,7 +166,7 @@ npm run package
 
 ## 验证范围
 
-通过 45 项核心与集成测试、25 项 Windows 原生便签验收，以及 13 项打包 CLI/MCP EXE 验收。包含真实截图、图片回传、断线恢复、日志路径、旧数据兼容、网络 SPI、主题、窗口记忆，以及清空子进程 PATH 后的 EXE 运行。详细记录见 [验证说明](docs/VERIFICATION.md)。
+通过 49 项核心与集成测试、27 项 Windows 原生便签验收，以及 17 项打包 CLI/MCP EXE 验收。包含默认请求在用户打字时保持等待、同一次调用接收完成回复、显式后台模式、真实截图、图片回传、断线恢复、日志路径、旧数据兼容、网络 SPI、主题、窗口记忆，以及清空子进程 PATH 后的 EXE 运行。详细记录见 [验证说明](docs/VERIFICATION.md)。
 
 ```powershell
 npm test

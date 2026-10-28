@@ -15,7 +15,7 @@ try {
   assert.ok(!plugins.isError, JSON.stringify(plugins));
   assert.equal(JSON.parse(plugins.content[0].text).length, 4);
   runtime = JSON.parse(readFileSync(join(directory, 'runtime.json'), 'utf8'));
-  const request = await client.callTool({ name: 'human_request', arguments: { title: '便携包 MCP 自动启动验收', plugins: [], idempotencyKey: 'packaged-autostart' } });
+  const request = await client.callTool({ name: 'human_request', arguments: { title: '便携包 MCP 自动启动验收', plugins: [], idempotencyKey: 'packaged-autostart', background: true } });
   assert.ok(!request.isError, JSON.stringify(request));
   const id = JSON.parse(request.content[0].text).id;
   const pending = await client.callTool({ name: 'human_get', arguments: { requestId: id } });
