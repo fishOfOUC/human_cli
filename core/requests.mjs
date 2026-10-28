@@ -3,7 +3,6 @@ import { EventEmitter } from 'node:events';
 import { createSchema, updateSchema, themes } from './schemas.mjs';
 import { fail, errorData } from './errors.mjs';
 import { RequestCache } from './cache.mjs';
-import { validateReplyText } from './plugin-output.mjs';
 
 export class RequestService extends EventEmitter {
   constructor(store, attachments, plugins) {
@@ -13,7 +12,6 @@ export class RequestService extends EventEmitter {
       store.data.pluginDefaults[builtinId(id)] ??= config; delete store.data.pluginDefaults[id];
     }
     for (const request of Object.values(store.data.requests)) {
-      request.replyNotes ||= [];
       for (const tool of request.tools) tool.plugin = builtinId(tool.plugin);
       // Upgrade old delivery receipts to a plain local cache. No receipt is needed.
       request.cache ||= request.delivery?.state === 'discarded' ? { state: 'discarded', discardedAt: request.delivery.discardedAt } : request.result ? { state: 'saved', savedAt: request.result.completedAt } : { state: 'not_ready' };
@@ -47,7 +45,7 @@ export class RequestService extends EventEmitter {
     });
     const request = {
       ...data, plugins: undefined, id: randomUUID(), version: 1, status: 'pending',
-      checks: [], reply: '', replyNotes: [], images: [], diagnostics: [], tools, result: null, cache: { state: 'not_ready' },
+      checks: [], reply: '', images: [], diagnostics: [], tools, result: null, cache: { state: 'not_ready' },
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     };
     this.store.data.requests[request.id] = request;
@@ -91,14 +89,11 @@ export class RequestService extends EventEmitter {
     return this.changed(r, 'attachment');
   }
   removeError(id, toolId) { const r = this.pending(id); r.diagnostics = r.diagnostics.filter((d) => d.toolId !== toolId); return this.changed(r, 'attachment'); }
-  removeReplyNote(id, toolId) { const r = this.pending(id); r.replyNotes = r.replyNotes.filter((note) => note.toolId !== toolId); return this.changed(r, 'attachment'); }
   complete(id, { version, only = false, reply, checks }) {
     const r = this.pending(id, version);
     if (reply !== undefined || checks !== undefined) this.draft(id, { reply, checks });
-    const combined = [r.reply.trim(), ...r.replyNotes.map((note) => note.text)].filter(Boolean).join('\n');
-    fail(only || combined.length <= 30000, 'E_REPLY', '回复及附言合计不能超过 30000 字符，请精简后再完成。');
     r.status = 'completed'; r.version++;
-    r.result = { requestId: id, status: 'completed', reply: only ? '已完成' : combined || '已完成', images: only ? [] : [...r.images], diagnostics: only ? [] : structuredClone(r.diagnostics), completedAt: new Date().toISOString() };
+    r.result = { requestId: id, status: 'completed', reply: only ? '已完成' : r.reply.trim() || '已完成', images: only ? [] : [...r.images], diagnostics: only ? [] : structuredClone(r.diagnostics), completedAt: new Date().toISOString() };
     r.cache = { state: 'saved', savedAt: r.result.completedAt };
     this.abortRuns(id); return this.changed(r, 'completed');
   }
@@ -106,7 +101,7 @@ export class RequestService extends EventEmitter {
     const r = this.get(id);
     fail(r.status === 'completed' && r.cache?.state === 'saved', 'E_REPLY_STATE', '没有可丢弃的缓存回复。', 409);
     fail(r.version === version, 'E_VERSION', '便签已变更，请重新确认。', 409);
-    r.reply = ''; r.replyNotes = []; r.images = []; r.diagnostics = []; r.result = null;
+    r.reply = ''; r.images = []; r.diagnostics = []; r.result = null;
     r.cache = { state: 'discarded', discardedAt: new Date().toISOString() };
     this.changed(r, 'discarded'); this.attachments.cleanupDiscarded();
     return this.snapshot(id);
@@ -173,16 +168,10 @@ export class RequestService extends EventEmitter {
     try {
       const output = await this.plugins.execute(tool.plugin, { request: { id, title: r.title, agent: r.agent, project: r.project }, config: structuredClone(tool.config) }, { signal: abort.signal, runId });
       if (r.status !== 'pending' || r.version !== version) throw Object.assign(new Error('请求已结束或被 AI 更新，本次运行结果未附入回复。'), { code: 'E_REQUEST_CHANGED' });
-      const replyText = validateReplyText(output.replyText)?.trim();
-      if (tool.config.autoAttach === true) fail(r.images.length + (output.attachments || []).filter((a) => a.mime?.startsWith('image/')).length <= 8, 'E_IMAGE_LIMIT', '回复最多附 8 张图片，请移除一张后重新截图。');
       const attachments = (output.attachments || []).map((a) => this.attachments.add(id, a).id);
-      tool.output = { text: output.text || '', ...(replyText ? { replyText } : {}), attachments, completedAt: new Date().toISOString() };
+      tool.output = { text: output.text || '', attachments, completedAt: new Date().toISOString() };
       if (tool.config.autoAttach === true) for (const attachmentId of attachments) {
         if (r.images.length < 8 && this.attachments.get(attachmentId).mime.startsWith('image/')) r.images.push(attachmentId);
-      }
-      if (tool.config.autoAttach === true && replyText) {
-        r.replyNotes = r.replyNotes.filter((note) => note.toolId !== toolId);
-        r.replyNotes.push({ toolId, text: replyText });
       }
       tool.state = 'success';
     } catch (error) { tool.state = 'error'; tool.error = errorData(error); }

@@ -142,8 +142,6 @@ python examples/spi-python/provider.py --port 7788
 
 将输出的 URL 与 token 填入 providers.json，再由 AI 把 example.python-note 绑定到便签。服务端实现 describe / start / status / cancel / forget，返回文字、图片或错误；前端共用配置和结果界面。
 
-另附可安装的 [“截图并附言”示例](examples/plugins/cursor-capture-reply/README.md)：鼠标所在屏幕截图、自动附图和附言，保留用户草稿。需要 v1.2.0 或更新桌面端。
-
 参阅 [插件开发](docs/PLUGINS.md)、[SPI 协议](docs/SPI.md) 和 [架构说明](docs/ARCHITECTURE.md)。远程提供者操作的是其所在机器资源，本机屏幕等能力需要本机提供者。
 
 ## 从源码运行与构建
@@ -168,7 +166,7 @@ npm run package
 
 ## 验证范围
 
-通过 54 项核心与集成测试、29 项 Windows 原生便签验收，以及 17 项打包 CLI/MCP EXE 验收。包含默认请求在用户打字时保持等待、同一次调用接收完成回复、显式后台模式、真实截图、图片回传、断线恢复、日志路径、旧数据兼容、网络 SPI、主题、窗口记忆，以及清空子进程 PATH 后的 EXE 运行。详细记录见 [验证说明](docs/VERIFICATION.md)。
+通过 49 项核心与集成测试、27 项 Windows 原生便签验收，以及 17 项打包 CLI/MCP EXE 验收。包含默认请求在用户打字时保持等待、同一次调用接收完成回复、显式后台模式、真实截图、图片回传、断线恢复、日志路径、旧数据兼容、网络 SPI、主题、窗口记忆，以及清空子进程 PATH 后的 EXE 运行。详细记录见 [验证说明](docs/VERIFICATION.md)。
 
 ```powershell
 npm test

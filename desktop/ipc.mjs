@@ -36,7 +36,6 @@ export function registerIpc(service, windows, pluginDirectory) {
         case 'attachImage': needRequest(); service.attach(id, data.id); break;
         case 'attachError': needRequest(); service.attachError(id, data.id); break;
         case 'removeError': needRequest(); service.removeError(id, data.id); break;
-        case 'removeReplyNote': needRequest(); service.removeReplyNote(id, data.id); break;
         case 'configureTool': needRequest(); service.configure(id, data.id, data.config); break;
         case 'runTool': needRequest(); service.run(id, data.id).catch(() => {}); break;
         case 'saveResult': {
