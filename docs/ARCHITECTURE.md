@@ -1,6 +1,6 @@
 # human_cli 架构
 
-human_cli 是由 AI 管理的人机协作工具。AI 创建、更新、取消请求；人读取说明、操作辅助工具、附图回复并完成。用户关闭窗口只收起，不提供用户创建便签的入口。
+human_cli 是由 AI 管理的人机协作工具。AI 创建、更新、取消请求；人读取说明、操作辅助工具、附图回复并完成。只有未完成任务显示便签；完成或取消即销毁窗口，不提供主界面、托盘或用户创建便签的入口。
 
 ```mermaid
 flowchart LR
@@ -26,16 +26,19 @@ flowchart LR
 | `core/` | 请求、版本检查、便签缓存和日志、用户丢弃、附件、持久化；不依赖 Electron/MCP |
 | `adapters/` | MCP、CLI、本机 AI 接口；不执行插件代码 |
 | `scripts/windows-cli.c` | 原生 Windows 控制台入口 human_cli.exe，转发 stdin/stdout/stderr 与退出码，使用包内运行时 |
+| `plugins/config-ui.mjs` | 配置界面清单、同源 URL 和提交数据校验 |
+| `plugins/ui-sessions.mjs` | 配置会话、保存冲突、持久化结果和断线恢复；不依赖 Electron |
+| `desktop/config-ui.mjs` | 隔离网页容器、共用区域布局、权限与窗口生命周期 |
 | `plugins/network-host.mjs` | 通过 HTTP SPI 发现插件、校验配置、开始/查询/取消任务及复制结果 |
 | `plugins/spi-rpc.mjs` | JSON-RPC、认证、连接故障检测、二进制线格式 |
 | `plugins/spi-server.mjs` | Node 参考提供者，用来暴露内置及兼容旧插件 |
 | `plugins/host.mjs`、`worker.mjs` | 旧 Node 插件的兼容提供者内部执行层 |
 | `plugins/builtin/` | 内置侧栏功能，统一暴露为本机网络 SPI |
-| `desktop/` | 窗口、托盘、系统能力、保存文件与 IPC |
+| `desktop/` | 按需窗口、进程生命周期、系统能力、保存文件与 IPC |
 | `src/` | 便签、主题、通用插件配置和结果、缓存/丢弃界面 |
 | `examples/spi-python/` | 无 human_cli/Node 依赖的独立 Python 提供者 |
 
-渲染进程启用 context isolation 与 sandbox，不接触 Node、任意 IPC 或文件路径。主进程验证调用来源；附件通过 ID 协议读取。外部插件的代码只运行在提供者进程中，human_cli 只接收清单、状态和结果。
+渲染进程启用 context isolation 与 sandbox，不接触 Node、任意 IPC 或文件路径。主进程验证调用来源；附件通过 ID 协议读取。外部插件的代码只运行在提供者进程中，human_cli 接收清单、状态和结果。web 配置页面另在独立隔离渲染容器显示，不获得便签 preload、Node、长期令牌或全局 IPC。
 
 AI 接口与插件接口是两条不同链路。本机 AI HTTP 接口绑定 loopback 随机端口，使用随机令牌并拒绝浏览器 Origin。SPI 客户端向用户配置的提供者地址发起连接；不把本机 AI 接口暴露到外网。
 
@@ -65,7 +68,7 @@ AI 更新说明增加 version，用户完成携带看到的版本；idempotencyK
 
 ## 原生窗口和主题
 
-纸面约 320 × 360 DIP，加两侧书签共 380 × 360 DIP。左键运行，右键共用详情区域；不自动抢换当前内页。用户关闭仅隐藏，托盘可恢复。
+纸面约 320 × 360 DIP，加两侧书签共 380 × 360 DIP。左键运行，右键共用详情区域；不自动抢换当前内页。临时收起最小化到任务栏。完成/取消后销毁窗口；没有未完成任务且 HTTP 响应传完后进程退出。详见 [LIFECYCLE.md](LIFECYCLE.md)。
 
 保存正常窗口 bounds、显示器 ID、工作区和 scaleFactor。Electron 坐标已是 DIP，不重复乘 DPI。显示器断开时按交集或主屏恢复，夹到工作区；监听显示器增减与度量变化。Windows 初次无边框调整被校正，尺寸落在可表示 DPI 网格，避免反复恢复时累积变大。
 
@@ -75,7 +78,7 @@ Windows 截图使用 Electron 提供的物理显示器矩形和固定 System.Dra
 
 默认 `%LOCALAPPDATA%\human_cli`，可用 HUMAN_CLI_DATA_DIR 覆盖。state.json 保存请求、回复、偏好和插件配置；attachments 保存原始附件；cache 保存按便签组织的 JSON 与附件副本；plugins/providers.json 配置网络服务；runtime.json 保存本次 AI 接口地址和令牌。
 
-目前是本机单用户、单写者的原子 JSON 存储。网络插件可以在其他机器；AI 请求通道本身尚未扩展成远程多租户服务。未实现热重载、自动安装外部服务、任意插件 HTML、签名安装器或自动更新。
+目前是本机单用户、单写者的原子 JSON 存储。网络插件可以在其他机器；AI 请求通道本身尚未扩展成远程多租户服务。未实现热重载、自动安装外部服务、签名安装器或自动更新。
 
 实现参考：[JSON-RPC 2.0](https://www.jsonrpc.org/specification)、[Electron 安全边界](https://www.electronjs.org/docs/latest/tutorial/security/)、[MCP SDK stdio](https://ts.sdk.modelcontextprotocol.io/server)。实际覆盖范围见 [VERIFICATION.md](VERIFICATION.md)。
 
@@ -84,3 +87,7 @@ Windows 截图使用 Electron 提供的物理显示器矩形和固定 System.Dra
 human_cli-desktop.exe 是桌面入口；human_cli.exe 是原生控制台入口，普通子命令运行包内 CLI，mcp 子命令运行包内 MCP stdio 服务。启动器通过 CreateProcessW 直接启动同目录运行时，按 Windows CRT 规则传递参数，不拼接 shell 命令，不依赖 PATH 中的 node.exe。子进程继承标准流，控制台启动器等待并返回其退出码。
 
 复用内置运行时依据 [Electron ELECTRON_RUN_AS_NODE](https://www.electronjs.org/docs/latest/api/environment-variables#electron_run_as_node)。开发打包使用 MinGW-w64 GCC 构建启动器，静态链接编译器支持库；用户无需安装该编译器或 Node。
+
+## 自定义配置界面
+
+默认 schema 表单保持原交互。web 模式通过 SPI 配置会话获取提供者页面，宿主以 WebContentsView 嵌入共用配置标签；插件页面只通过自己的同源 HTTP 服务编辑草稿。宿主查询 submitted、校验版本/配置冲突/Schema、持久化后 resolve，失败保持原配置；退出结束会话。详细状态与消息见 [CONFIG-UI.md](CONFIG-UI.md)。

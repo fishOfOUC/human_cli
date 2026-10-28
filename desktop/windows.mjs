@@ -4,8 +4,9 @@ import { restoreBounds, stableBounds } from './geometry.mjs';
 
 export class WindowManager {
   constructor(root, store) { this.root = root; this.store = store; this.windows = new Map(); this.quitting = false; this.captureActive = false; }
-  open(requestId = null) {
-    const key = requestId || 'home';
+  open(requestId) {
+    if (!requestId || this.store.data.requests[requestId]?.status !== 'pending') return null;
+    const key = requestId;
     if (this.windows.has(key)) { const win = this.windows.get(key); if (win.isMinimized()) win.restore(); win.show(); return win; }
     const bounds = restoreBounds(this.store.data.geometry, screen.getAllDisplays(), screen.getPrimaryDisplay().id);
     let restoring = true;
@@ -33,20 +34,29 @@ export class WindowManager {
     });
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     win.webContents.on('will-navigate', (event) => event.preventDefault());
-    win.on('close', (event) => { if (!this.quitting) { event.preventDefault(); win.hide(); } });
-    win.on('closed', () => this.windows.delete(key));
+    win.on('close', (event) => { if (!this.quitting) { event.preventDefault(); win.minimize(); } });
+    win.on('closed', () => { clearTimeout(saveTimer); this.windows.delete(key); });
     let saveTimer;
+    const persistGeometry = () => {
+      if (restoring || win.isDestroyed() || win.isMinimized() || win.isMaximized() || this.captureActive) return;
+      const normal = win.getNormalBounds(), display = screen.getDisplayMatching(normal);
+      this.store.data.geometry = { bounds: stableBounds(normal, display.scaleFactor), displayId: display.id, workArea: display.workArea, scaleFactor: display.scaleFactor };
+      this.store.save();
+    };
+    win.flushGeometry = () => { if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; persistGeometry(); } };
     const saveGeometry = () => {
       if (restoring) return;
-      clearTimeout(saveTimer); saveTimer = setTimeout(() => {
-        if (win.isDestroyed() || win.isMinimized() || win.isMaximized() || this.captureActive) return;
-        const normal = win.getNormalBounds(), display = screen.getDisplayMatching(normal);
-        this.store.data.geometry = { bounds: stableBounds(normal, display.scaleFactor), displayId: display.id, workArea: display.workArea, scaleFactor: display.scaleFactor };
-        this.store.save();
-      }, 180);
+      clearTimeout(saveTimer); saveTimer = setTimeout(() => { saveTimer = null; persistGeometry(); }, 180);
     };
     win.on('move', saveGeometry); win.on('resize', saveGeometry);
     return win;
+  }
+  finish(requestId) {
+    const win = this.windows.get(requestId); if (!win || win.isDestroyed()) return;
+    win.flushGeometry();
+    win.hide();
+    // Let the completion IPC response leave before destroying its sender.
+    setImmediate(() => { if (!win.isDestroyed()) win.destroy(); });
   }
   forSender(sender) { return [...this.windows.values()].find((win) => win.webContents === sender && !win.isDestroyed()); }
   displayChanged() {

@@ -31,7 +31,7 @@ try {
     const response = await fetch(runtime.url + path, { method, headers: { Authorization: `Bearer ${runtime.token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
     const result = await response.json(); if (!response.ok) throw new Error(JSON.stringify(result)); return result;
   };
-  const home = BrowserWindow.getAllWindows().find((w) => !w.requestId); await ready(home);
+  check('Startup has no home or waiting window', BrowserWindow.getAllWindows().length === 0);
   const js = (win, code) => win.webContents.executeJavaScript(code, true);
   const capture = async (win, name) => {
     // DOM updates may precede Chromium's composited frame. Capture the painted state.
@@ -39,9 +39,11 @@ try {
     await sleep(100);
     writeFileSync(join(output, name), (await win.webContents.capturePage()).toPNG());
   };
-  check('Idle desktop waits for AI and has no New note action', await js(home, 'document.querySelector("h1").textContent.includes("AI") && !document.body.textContent.includes("新便签")'));
+
   const request = await api('/requests', 'POST', { title: '原生验收：请帮我确认界面', agent: '测试 AI', steps: ['确认主题', '截图后回复'], plugins: [{ id: 'capture', plugin: 'human.screenshot', config: { delayMs: 0, display: 'primary', autoAttach: true } }, { id: 'diagnostics', plugin: 'human.diagnostics', config: {} }] });
   const win = await until(() => BrowserWindow.getAllWindows().find((w) => w.requestId === request.id)); await ready(win);
+  const keeper = await api('/requests', 'POST', { title: '并行任务保活验收', plugins: [] });
+  const home = await until(() => BrowserWindow.getAllWindows().find((w) => w.requestId === keeper.id)); await ready(home);
   win.webContents.on('render-process-gone', (_event, info) => errors.push(info.reason));
   win.webContents.on('console-message', (_event, details) => { if (details.level === 'error') errors.push(details.message); });
   check('AI request opens a real compact native topmost window', win.isAlwaysOnTop() && Math.abs(win.getBounds().width - 380) <= 10 && Math.abs(win.getBounds().height - 360) <= 10);
@@ -86,6 +88,9 @@ try {
   mcpTransport.stderr?.on('data', (chunk) => console.error(`MCP STDERR: ${chunk}`));
   await client.connect(mcpTransport);
   const waiting = client.callTool({ name: 'human_wait', arguments: { requestId: request.id } });
+  win.setBounds({ ...win.getBounds(), x: win.getBounds().x - 30, width: 410, height: 390 }); await sleep(350);
+  const remembered = JSON.parse(readFileSync(join(process.env.HUMAN_CLI_DATA_DIR, 'state.json'), 'utf8')).geometry.bounds;
+  check('Native move and resize are persisted on a stable DPI grid', Math.abs(remembered.width - win.getBounds().width) <= 2 && Math.abs(remembered.height - win.getBounds().height) <= 2);
   await js(win, 'document.querySelector("[data-action=complete]").click()');
   const result = await waiting;
   let metadata = JSON.parse(result.content[0].text), receivedImages = result.content.filter((c) => c.type === 'image');
@@ -98,37 +103,23 @@ try {
   const cached = logs.entries.find((entry) => entry.id === request.id);
   const cachedReply = JSON.parse(readFileSync(cached.cache.replyPath, 'utf8'));
   check('Native reply is recoverable through logs and local image files without acknowledgement', cachedReply.reply === '原生验收已完成' && cachedReply.images.length === 4 && readFileSync(cachedReply.images[0].path).length > 100);
-  await capture(win, 'completed.png');
-  win.setBounds({ ...win.getBounds(), x: win.getBounds().x - 30, width: 410, height: 390 }); await sleep(350);
-  const remembered = JSON.parse(readFileSync(join(process.env.HUMAN_CLI_DATA_DIR, 'state.json'), 'utf8')).geometry.bounds;
-  check('Native move and resize are persisted on a stable DPI grid', Math.abs(remembered.width - win.getBounds().width) <= 2 && Math.abs(remembered.height - win.getBounds().height) <= 2);
+  await until(() => win.isDestroyed());
+  check('Completed note disappears without a result window; another request stays visible', !home.isDestroyed() && home.isVisible());
   const second = await api('/requests', 'POST', { title: '检查位置恢复' });
   const secondWin = await until(() => BrowserWindow.getAllWindows().find((w) => w.requestId === second.id)); await ready(secondWin);
   check('Next AI request reuses saved size', Math.abs(secondWin.getBounds().width - remembered.width) <= 1 && Math.abs(secondWin.getBounds().height - remembered.height) <= 1);
   await js(secondWin, 'document.querySelector("[data-action=hide]").click()');
-  await sleep(100); check('User close hides without cancelling AI request', !secondWin.isVisible() && (await api(`/requests/${second.id}`)).status === 'pending');
+  await sleep(100); check('User minimize retains taskbar access without cancelling AI request', secondWin.isMinimized() && (await api(`/requests/${second.id}`)).status === 'pending');
   await api(`/requests/${second.id}/cancel`, 'POST', { reason: '验收结束' });
-  await until(() => js(secondWin, 'document.querySelector("h1").textContent.includes("取消")'));
-  check('AI cancellation reaches native note state', await js(secondWin, 'document.querySelector("h1").textContent.includes("取消")'));
+  await until(() => secondWin.isDestroyed());
+  check('AI cancellation destroys the corresponding note', true);
   const offline = await api('/requests', 'POST', { title: '离线回复处理验收', plugins: [] });
   const offlineWin = await until(() => BrowserWindow.getAllWindows().find((w) => w.requestId === offline.id)); await ready(offlineWin);
   await js(offlineWin, 'document.querySelector("#reply").value="这份回复先保存在本机";document.querySelector("#reply").dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("[data-action=complete]").click()');
   await until(async () => (await api(`/requests/${offline.id}`)).status === 'completed');
-  await until(() => js(offlineWin, 'document.querySelector("h1").textContent==="回复已保存"'));
-  check('Disconnected reply is saved locally with no receipt or delivery status', (await api(`/requests/${offline.id}`)).cache.state === 'saved' && !await js(offlineWin, 'document.body.textContent.includes("确认收到") || document.body.textContent.includes("待交付")'));
-  await capture(offlineWin, 'cached-reply.png');
-  await js(offlineWin, 'document.querySelector("[data-action=discard-reply]").click()');
-  await js(offlineWin, 'document.querySelector("#nav-note").click()');
-  check('Discard requires explicit confirmation and can be abandoned', (await api(`/requests/${offline.id}`)).result.reply === '这份回复先保存在本机');
-  await js(offlineWin, 'document.querySelector("[data-action=discard-reply]").click()');
-  await until(() => js(offlineWin, 'Boolean(document.querySelector("[data-action=confirm-discard]"))'));
-  await js(offlineWin, 'document.querySelector("[data-action=confirm-discard]").click()');
-  await until(async () => (await api(`/requests/${offline.id}`)).cache.state === 'discarded');
-  const discarded = await api(`/requests/${offline.id}`);
-  check('User discard clears queued reply without AI cancellation', discarded.result === null && discarded.reply === '' && discarded.status === 'completed' && !discarded.cancelReason);
-  const discardedResult = await client.callTool({ name: 'human_wait', arguments: { requestId: offline.id } });
-  check('AI receives only discarded marker after user discards queued reply', JSON.parse(discardedResult.content[0].text).status === 'reply_discarded' && !JSON.stringify(discardedResult).includes('先保存在本机'));
-  await capture(offlineWin, 'discarded.png');
+  await until(() => offlineWin.isDestroyed());
+  const offlineSaved = await api(`/requests/${offline.id}`);
+  check('Disconnected reply is saved before its note disappears', offlineSaved.cache.state === 'saved' && JSON.parse(readFileSync(offlineSaved.cache.replyPath, 'utf8')).reply === '这份回复先保存在本机');
   let cliClosed = false, cliOutput = '', cliError = '';
   cliProcess = spawn(process.execPath, [resolve('adapters/cli.mjs'), 'request', '-'], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', HUMAN_CLI_NO_AUTOSTART: '1' }, stdio: 'pipe' });
   cliProcess.stdout.setEncoding('utf8').on('data', (chunk) => { cliOutput += chunk; });
@@ -144,6 +135,8 @@ try {
   await js(blockingWin, 'document.querySelector("#reply").value="我已验收";document.querySelector("#reply").dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("[data-action=complete]").click()');
   const cliCode = await cliFinished, cliResult = JSON.parse(cliOutput);
   check('Native completion returns reply to the same CLI request without a second wait call', cliCode === 0 && cliResult.status === 'completed' && cliResult.result.reply === '我已验收' && cliError.includes('waiting_for_user'));
+  await api(`/requests/${keeper.id}/cancel`, 'POST', { reason: '并行任务验收结束' });
+  await until(() => home.isDestroyed());
   check('No native renderer errors', errors.length === 0);
   writeFileSync(join(output, 'report.json'), JSON.stringify({ passed: checks.length, checks, errors }, null, 2));
   console.log(`NATIVE REPORT ${join(output, 'report.json')}`);

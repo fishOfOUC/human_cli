@@ -154,9 +154,16 @@ export class RequestService extends EventEmitter {
   configure(id, toolId, config) {
     const r = this.pending(id), tool = r.tools.find((t) => t.id === toolId);
     fail(tool, 'E_TOOL', '工具不存在。'); fail(tool.state !== 'running', 'E_RUNNING', '工具运行时不能修改配置。');
-    tool.config = this.plugins.validateConfig(tool.plugin, config);
-    this.store.data.pluginDefaults[tool.plugin] = structuredClone(tool.config);
-    return this.changed(r, 'config');
+    const next = this.plugins.validateConfig(tool.plugin, config), previous = tool.config;
+    const defaultExisted = Object.hasOwn(this.store.data.pluginDefaults, tool.plugin), previousDefault = this.store.data.pluginDefaults[tool.plugin], previousUpdated = r.updatedAt;
+    tool.config = next; this.store.data.pluginDefaults[tool.plugin] = structuredClone(next);
+    try { return this.changed(r, 'config'); }
+    catch (error) {
+      tool.config = previous; r.updatedAt = previousUpdated;
+      if (defaultExisted) this.store.data.pluginDefaults[tool.plugin] = previousDefault; else delete this.store.data.pluginDefaults[tool.plugin];
+      try { this.store.save(); this.cache.sync(r); } catch {}
+      throw error;
+    }
   }
   async run(id, toolId) {
     const r = this.pending(id), tool = r.tools.find((t) => t.id === toolId);

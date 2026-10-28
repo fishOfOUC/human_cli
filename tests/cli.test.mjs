@@ -6,9 +6,10 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fixture, png } from './helpers.mjs';
 import { startApi } from '../adapters/http.mjs';
+import { createServer } from 'node:http';
 
-async function setup(t) {
-  const f = fixture(t), api = await startApi(f.service);
+async function setup(t, apiFactory = startApi) {
+  const f = fixture(t), api = await apiFactory(f.service);
   t.after(() => { api.server.closeAllConnections(); return new Promise((done) => api.server.close(done)); });
   writeFileSync(join(f.directory, 'runtime.json'), JSON.stringify({ url: api.url, token: api.token }));
   const run = (args, input) => {
@@ -23,6 +24,27 @@ async function setup(t) {
   };
   return { ...f, run };
 }
+
+test('a lost creation response retries with the same idempotency key and creates only one note', async (t) => {
+  const keys = [];
+  const { service, run } = await setup(t, async (service) => {
+    const server = createServer(async (req, res) => {
+      if (req.url === '/health') { res.end(JSON.stringify({ name: 'human_cli' })); return; }
+      const chunks = []; for await (const chunk of req) chunks.push(chunk);
+      const input = JSON.parse(Buffer.concat(chunks).toString()); keys.push(input.idempotencyKey);
+      const request = service.create(input);
+      if (keys.length === 1) req.socket.destroy();
+      else { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(request)); }
+    });
+    await new Promise((done) => server.listen(0, '127.0.0.1', done));
+    return { server, token: 'test-token', url: `http://127.0.0.1:${server.address().port}` };
+  });
+  const result = await run(['request', '-', '--background'], JSON.stringify({ title: '安全重连', plugins: [] })).done;
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(service.list().length, 1); assert.equal(keys.length, 2);
+  assert.ok(keys[0]); assert.equal(keys[0], keys[1]);
+  assert.equal(JSON.parse(result.stdout).id, service.list()[0].id);
+});
 async function until(check) {
   for (let attempt = 0; attempt < 200; attempt++) { const value = check(); if (value) return value; await new Promise((done) => setTimeout(done, 10)); }
   throw new Error('CLI did not reach expected state');

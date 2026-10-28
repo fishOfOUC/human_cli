@@ -6,9 +6,9 @@ import './style.css';
 import './desktop.css';
 
 const bridge = window.humanCli;
-const local = { pane: 'note', reply: '', checks: [], requestId: null, version: null, configDrafts: {}, openSettings: new Set() };
+const local = { pane: 'note', reply: '', checks: [], requestId: null, version: null, configDrafts: {}, openSettings: new Set(), toolTabs: {} };
 let state, draftTimer, toastTimer, draftChain = Promise.resolve(), completing = false;
-$('#app').innerHTML = `<main class="note-window" aria-label="AI 协助便签"><header class="window-titlebar"><div class="window-identity">${icon('bot')}<span id="agent-name">human_cli</span></div><div class="window-controls"><button class="icon-button" data-action="pane" data-pane="settings" aria-label="主题和偏好" title="主题和偏好">${icon('settings')}</button><button class="icon-button pin-control" data-action="pin" aria-label="切换置顶" title="切换置顶">${icon('pin')}</button><button class="icon-button" data-action="hide" aria-label="收起便签" title="收起，AI 请求继续等待">${icon('minus')}</button><button class="icon-button close" data-action="hide" aria-label="关闭便签" title="关闭只收起，不取消 AI 请求">${icon('x')}</button></div></header><div class="note-body"></div><div class="resize-handle" data-resize aria-label="拖动调整大小">${icon('grip')}</div><div class="note-toast" role="status" aria-live="polite"></div></main><input id="image-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden />`;
+$('#app').innerHTML = `<main class="note-window" aria-label="AI 协助便签"><header class="window-titlebar"><div class="window-identity">${icon('bot')}<span id="agent-name">human_cli</span></div><div class="window-controls"><button class="icon-button" data-action="pane" data-pane="settings" aria-label="便签主题" title="便签主题">${icon('settings')}</button><button class="icon-button pin-control" data-action="pin" aria-label="切换置顶" title="切换置顶">${icon('pin')}</button><button class="icon-button" data-action="hide" aria-label="最小化到任务栏" title="最小化到任务栏，AI 请求继续等待">${icon('minus')}</button></div></header><div class="note-body"></div><div class="resize-handle" data-resize aria-label="拖动调整大小">${icon('grip')}</div><div class="note-toast" role="status" aria-live="polite"></div></main><input id="image-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden />`;
 
 function toast(text) {
   clearTimeout(toastTimer); $('.note-toast').textContent = text; $('.note-toast').classList.add('visible');
@@ -33,7 +33,7 @@ function receive(next) {
 function render() {
   if (!state) return;
   applyTheme(state.preferences.theme);
-  const focused = document.activeElement, focusId = focused?.id;
+  const focused = document.activeElement, focusId = focused?.id, hadFocus = document.hasFocus();
   const selection = typeof focused?.selectionStart === 'number' ? [focused.selectionStart, focused.selectionEnd] : null;
   const oldPane = $('#shared-panel')?.dataset.pane, scroll = $('.pane-scroll')?.scrollTop || 0;
   const request = state.request ? { ...state.request, reply: local.reply, checks: local.checks } : null;
@@ -44,12 +44,39 @@ function render() {
   refreshIcons();
   if (oldPane === local.pane) {
     const replacement = focusId && document.getElementById(focusId);
-    replacement?.focus({ preventScroll: true });
+    if (hadFocus) replacement?.focus({ preventScroll: true });
     if (replacement && selection && replacement.setSelectionRange) replacement.setSelectionRange(...selection);
     if ($('.pane-scroll')) $('.pane-scroll').scrollTop = scroll;
   }
+  requestAnimationFrame(syncConfigBounds);
 }
-function pane(id) { local.pane = id; render(); }
+function pane(id) {
+  if (id !== local.pane && state?.configUi) execute(() => call('closeConfigUi'));
+  local.pane = id; render();
+}
+let lastConfigBounds = '';
+function configBounds() {
+  const host = $('[data-config-ui-host]'); if (!host) return null;
+  const { x, y, width, height } = host.getBoundingClientRect();
+  return { id: host.dataset.configUiHost, bounds: { x, y, width, height } };
+}
+function syncConfigBounds() {
+  if (!bridge || !state) return;
+  const current = configBounds(), serialized = JSON.stringify(current);
+  if (serialized === lastConfigBounds) return;
+  lastConfigBounds = serialized;
+  execute(() => call('configUiBounds', current?.id, current?.bounds || null));
+}
+async function openToolPanel(id) {
+  const tool = state.request?.tools.find((item) => item.id === id);
+  if (local.pane !== id && state.configUi) await call('closeConfigUi');
+  if (tool?.manifest.configUi?.type === 'web') local.toolTabs[id] = 'config';
+  local.pane = id; render();
+  if (tool?.manifest.configUi?.type === 'web' && state.request.status === 'pending') {
+    await call('openConfigUi', id, configBounds()?.bounds);
+    lastConfigBounds = ''; requestAnimationFrame(syncConfigBounds);
+  }
+}
 function saveDraft() {
   clearTimeout(draftTimer);
   if (!state.request || state.request.status !== 'pending') return draftChain;
@@ -69,7 +96,7 @@ async function finish(only = false) {
   try {
     await saveDraft();
     await call('complete', { version, only, reply: local.reply, checks: local.checks });
-    local.pane = 'note'; toast('回复已保存到本机缓存');
+
   } finally { completing = false; }
 }
 async function addFiles(files) {
@@ -96,10 +123,13 @@ const actions = {
   complete: () => finish(),
   only: () => { if (local.reply.trim() || state.request.images.length || state.request.diagnostics.length) pane('confirm-only'); else return finish(true); },
   'confirm-only': () => finish(true),
-  'discard-reply': () => pane('confirm-discard'),
-  'confirm-discard': async () => { await call('discardReply', state.request.version); local.reply = ''; local.pane = 'note'; render(); toast('缓存回复已丢弃'); },
-  'show-request': (button) => call('showRequest', button.dataset.id),
-  'open-plugins': () => call('openPlugins'),
+  'open-config-ui': (button) => openToolPanel(button.dataset.tool),
+  'tool-tab': async (button) => {
+    if (button.dataset.tab === 'config') return openToolPanel(button.dataset.tool);
+    local.toolTabs[button.dataset.tool] = 'result'; render();
+    await call('closeConfigUi');
+  },
+  'copy-config-error': async () => { const error = state.configUi?.error; if (error) { await call('copyText', `${error.code}\n${error.message}\n${error.details || ''}`); toast('配置错误已复制'); } },
 };
 function execute(action) { Promise.resolve().then(action).catch((error) => toast(error.message)); }
 document.addEventListener('click', (event) => {
@@ -108,7 +138,7 @@ document.addEventListener('click', (event) => {
 });
 document.addEventListener('contextmenu', (event) => {
   const button = event.target.closest('.bookmark[data-tool]');
-  if (button) { event.preventDefault(); pane(button.dataset.tool); document.getElementById(button.id)?.focus(); }
+  if (button) { event.preventDefault(); execute(() => openToolPanel(button.dataset.tool)); }
 });
 function configDraft(form) {
   const tool = state.request.tools.find((t) => t.id === form.dataset.id), data = new FormData(form), config = {};
@@ -146,7 +176,7 @@ document.addEventListener('submit', (event) => {
 document.addEventListener('keydown', (event) => {
   if (!state) return;
   const button = event.target.closest('.bookmark[data-tool]');
-  if (button && (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) { event.preventDefault(); pane(button.dataset.tool); document.getElementById(button.id)?.focus(); return; }
+  if (button && (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) { event.preventDefault(); execute(() => openToolPanel(button.dataset.tool)); return; }
   if (button && ['Enter', ' '].includes(event.key) && !event.ctrlKey && !event.metaKey) { event.preventDefault(); if (!event.repeat) execute(() => actions.run(button)); return; }
   if (event.key === 'Escape') { pane('note'); return; }
   if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && local.pane === 'note') { event.preventDefault(); execute(() => finish()); }
@@ -170,6 +200,7 @@ $('[data-resize]').addEventListener('pointerdown', (event) => {
 document.addEventListener('pointermove', (event) => { if (resize) execute(() => call('resize', { width: resize.width + event.screenX - resize.x, height: resize.height + event.screenY - resize.y })); });
 document.addEventListener('pointerup', () => { resize = null; });
 document.addEventListener('pointercancel', () => { resize = null; });
+new ResizeObserver(() => requestAnimationFrame(syncConfigBounds)).observe($('.note-window'));
 refreshIcons();
 if (!bridge) {
   $('.note-body').innerHTML = '<article class="paper"><div class="pane-scroll empty-note"><h1>请从桌面端打开 human_cli。</h1><p>运行 npm start，或双击“启动 human_cli.cmd”。AI 调用 MCP 后会自动出现协助便签。</p></div></article>';

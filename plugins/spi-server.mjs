@@ -5,12 +5,13 @@ import { SPI_VERSION, encodeOutput } from './spi-rpc.mjs';
 
 // Reference provider implementation. human_cli clients use only its network protocol;
 // providers in other languages implement the same five JSON-RPC methods.
-export async function startSpiServer({ plugins, execute, token = randomBytes(32).toString('hex'), port = 0, host = '127.0.0.1', retentionMs = 300000 }) {
+export async function startSpiServer({ plugins, execute, configUi, token = randomBytes(32).toString('hex'), port = 0, host = '127.0.0.1', retentionMs = 300000 }) {
   const jobs = new Map();
   const server = createServer(async (req, res) => {
     let id = null;
     const reply = (message, status = 200) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ jsonrpc: '2.0', id, ...message })); };
     try {
+      if (configUi?.handleHttp && await configUi.handleHttp(req, res)) return;
       fail(req.method === 'POST' && !req.headers.origin, 'E_SPI_REQUEST', 'SPI 仅接受服务端 POST。', 403);
       const candidate = Buffer.from(req.headers.authorization?.replace(/^Bearer /, '') || '');
       fail(candidate.length === token.length && timingSafeEqual(candidate, Buffer.from(token)), 'E_SPI_AUTH', 'SPI 认证失败。', 401);
@@ -21,6 +22,12 @@ export async function startSpiServer({ plugins, execute, token = randomBytes(32)
       fail(message.jsonrpc === '2.0' && (typeof id === 'string' || typeof id === 'number') && typeof message.method === 'string', 'E_SPI_PROTOCOL', '无效 JSON-RPC 请求。');
       const params = message.params || {};
       if (message.method === 'spi.describe') return reply({ result: { spiVersion: SPI_VERSION, plugins: typeof plugins === 'function' ? plugins() : plugins } });
+      if (message.method.startsWith('spi.ui.')) {
+        const method = message.method.slice(7);
+        fail(['open', 'status', 'resolve', 'close'].includes(method) && typeof configUi?.[method] === 'function', 'E_SPI_METHOD', '服务未实现该配置界面方法。');
+        fail(typeof params.sessionId === 'string' && /^[a-f0-9-]{36}$/.test(params.sessionId), 'E_UI_SESSION', '需要有效配置会话 ID。');
+        return reply({ result: await configUi[method](params, { origin: `http://${host}:${server.address().port}` }) });
+      }
       fail(typeof params.runId === 'string' && /^[a-f0-9-]{36}$/.test(params.runId), 'E_SPI_RUN_ID', '需要有效 runId。');
       if (message.method === 'spi.start') {
         if (!jobs.has(params.runId)) {
@@ -49,7 +56,7 @@ export async function startSpiServer({ plugins, execute, token = randomBytes(32)
       fail(false, 'E_SPI_METHOD', '不支持的 SPI 方法。');
     } catch (error) { reply({ error: { code: error.code === 'E_SPI_METHOD' ? -32601 : -32000, message: error.message, data: errorData(error) } }, error.status === 401 || error.status === 403 ? error.status : 200); }
   });
-  server.on('close', () => { for (const job of jobs.values()) { clearTimeout(job.expiry); if (job.state === 'running') { job.state = 'cancelled'; job.abort.abort(); } } jobs.clear(); });
+  server.on('close', () => { for (const job of jobs.values()) { clearTimeout(job.expiry); if (job.state === 'running') { job.state = 'cancelled'; job.abort.abort(); } } jobs.clear(); configUi?.dispose?.(); });
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, host, resolve); });
   return { server, token, url: `http://${host}:${server.address().port}/rpc`, jobs };
 }

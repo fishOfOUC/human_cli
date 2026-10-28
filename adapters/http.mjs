@@ -7,9 +7,11 @@ async function body(req) {
   for await (const chunk of req) { size += chunk.length; fail(size <= 256 * 1024, 'E_BODY_SIZE', '请求体过大。', 413); chunks.push(chunk); }
   try { return JSON.parse(Buffer.concat(chunks).toString() || '{}'); } catch { fail(false, 'E_JSON', 'JSON 格式不正确。'); }
 }
-export async function startApi(service) {
+export async function startApi(service, { activity } = {}) {
   const token = randomBytes(32).toString('hex');
   const server = createServer(async (req, res) => {
+    const done = activity?.(req.url.split('?')[0]);
+    if (done) { res.once('finish', done); res.once('close', done); }
     const send = (status, value) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(value)); };
     try {
       fail(!req.headers.origin, 'E_ORIGIN', '浏览器来源不能直接调用 AI 接口。', 403);

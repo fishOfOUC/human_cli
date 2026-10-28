@@ -3,6 +3,7 @@ import Ajv from 'ajv';
 import { readFileSync, existsSync } from 'node:fs';
 import { fail } from '../core/errors.mjs';
 import { SPI_VERSION, rpc, decodeOutput, validateEndpoint } from './spi-rpc.mjs';
+import { configUiDescriptor, configUiUrl, configUiStatus } from './config-ui.mjs';
 
 export function readProviders(path) {
   if (!existsSync(path)) return [];
@@ -31,7 +32,7 @@ export class NetworkPluginHost {
           fail(manifest.apiVersion === 1 && /^[a-z][a-z0-9.-]{0,127}$/.test(manifest.id), 'E_SPI_MANIFEST', '插件缺少有效 id 或 apiVersion。');
           fail(typeof manifest.name === 'string' && manifest.name.length <= 60 && ['left', 'right'].includes(manifest.side) && manifest.configSchema?.type === 'object', 'E_SPI_MANIFEST', '无效插件清单。');
           fail(!this.definitions.has(manifest.id), 'E_PLUGIN_DUPLICATE', `插件 ID 重复：${manifest.id}`);
-          const clean = { apiVersion: 1, id: manifest.id, name: manifest.name, version: String(manifest.version || '1'), description: String(manifest.description || ''), icon: manifest.icon || 'puzzle', side: manifest.side, configSchema: manifest.configSchema, providerId: provider.id };
+          const clean = { apiVersion: 1, id: manifest.id, name: manifest.name, version: String(manifest.version || '1'), description: String(manifest.description || ''), icon: manifest.icon || 'puzzle', side: manifest.side, configSchema: manifest.configSchema, configUi: configUiDescriptor(manifest.configUi, provider.url), providerId: provider.id };
           this.definitions.set(clean.id, { manifest: clean, provider, validate: this.ajv.compile(clean.configSchema) });
         }
       } catch (error) { this.loadErrors.push({ folder: provider.id, message: error.message }); }
@@ -44,6 +45,27 @@ export class NetworkPluginHost {
     const definition = this.get(id), result = structuredClone(config);
     fail(definition.validate(result), 'E_PLUGIN_CONFIG', `插件配置无效：${this.ajv.errorsText(definition.validate.errors)}`);
     return result;
+  }
+  async openConfigUi(id, params, { signal } = {}) {
+    const { provider, manifest } = this.get(id);
+    fail(manifest.configUi.type === 'web', 'E_UI_UNSUPPORTED', '该插件没有自定义网页配置。');
+    const value = await rpc(provider, 'spi.ui.open', { ...params, pluginId: id }, { signal, timeoutMs: this.rpcTimeoutMs });
+    fail(value?.sessionId === params.sessionId, 'E_UI_PROTOCOL', '配置会话 ID 不匹配。');
+    return { sessionId: params.sessionId, url: configUiUrl(value.url, manifest.configUi, provider.url, provider.token), origin: new URL(provider.url).origin, path: manifest.configUi.path };
+  }
+  async configUiStatus(id, sessionId, { signal } = {}) {
+    const { provider } = this.get(id);
+    return configUiStatus(await rpc(provider, 'spi.ui.status', { sessionId }, { signal, timeoutMs: this.rpcTimeoutMs }), sessionId);
+  }
+  async resolveConfigUi(id, sessionId, resolution, { signal } = {}) {
+    const { provider } = this.get(id);
+    const value = await rpc(provider, 'spi.ui.resolve', { sessionId, ...resolution }, { signal, timeoutMs: this.rpcTimeoutMs });
+    fail(value?.sessionId === sessionId, 'E_UI_PROTOCOL', '保存配置响应的会话 ID 不匹配。');
+    return value;
+  }
+  async closeConfigUi(id, sessionId) {
+    const { provider } = this.get(id);
+    return rpc(provider, 'spi.ui.close', { sessionId }, { timeoutMs: Math.min(1000, this.rpcTimeoutMs) });
   }
   async execute(id, context, { signal, runId = randomUUID() } = {}) {
     const { provider } = this.get(id), options = { signal, timeoutMs: this.rpcTimeoutMs };

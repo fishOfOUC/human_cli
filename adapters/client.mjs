@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { randomUUID } from 'node:crypto';
 import { runtimePath } from '../core/paths.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -45,13 +46,23 @@ export async function ensureDesktop() {
   return starting;
 }
 export async function api(path, method = 'GET', data, { signal, wait = false } = {}) {
-  const runtime = await ensureDesktop();
-  const response = await fetch(`${runtime.url}${path}`, {
-    method, headers: { Authorization: `Bearer ${runtime.token}`, 'Content-Type': 'application/json' },
-    ...(data !== undefined ? { body: JSON.stringify(data) } : {}),
-    ...(wait ? { signal } : { signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30000)]) : AbortSignal.timeout(30000) }),
-  });
-  const value = await response.json();
-  if (!response.ok) throw Object.assign(new Error(value.error?.message || `HTTP ${response.status}`), { code: value.error?.code });
-  return value;
+  // An idle host can finish exiting between its health check and this request.
+  // GETs are repeatable; request creation reuses one key across transport retries.
+  const creating = method === 'POST' && path === '/requests';
+  if (creating && !data?.idempotencyKey) data = { ...data, idempotencyKey: randomUUID() };
+  for (let attempt = 0; ; attempt++) {
+    const runtime = await ensureDesktop();
+    try {
+      const response = await fetch(`${runtime.url}${path}`, {
+        method, headers: { Authorization: `Bearer ${runtime.token}`, 'Content-Type': 'application/json' },
+        ...(data !== undefined ? { body: JSON.stringify(data) } : {}),
+        ...(wait ? { signal } : { signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30000)]) : AbortSignal.timeout(30000) }),
+      });
+      const value = await response.json();
+      if (!response.ok) throw Object.assign(new Error(value.error?.message || `HTTP ${response.status}`), { code: value.error?.code });
+      return value;
+    } catch (error) {
+      if (attempt >= 1 || signal?.aborted || !(method === 'GET' || creating) || error.name !== 'TypeError') throw error;
+    }
+  }
 }

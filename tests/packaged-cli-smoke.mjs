@@ -85,6 +85,12 @@ try {
   const mcpLogs = await client.callTool({ name: 'human_logs', arguments: {} });
   check('EXE mcp logs can recover CLI-created requests', JSON.parse(mcpLogs.content[0].text).entries.some((entry) => entry.id === request.id));
   await client.close(); client = null;
+  await json(['cancel', stdin.id, '结束最后一张便签']);
+  for (let attempt = 0; attempt < 100 && existsSync(join(environment.HUMAN_CLI_DATA_DIR, 'runtime.json')); attempt++) await new Promise((done) => setTimeout(done, 50));
+  check('Packaged desktop exits automatically after the last task', !existsSync(join(environment.HUMAN_CLI_DATA_DIR, 'runtime.json')));
+  check('A later CLI query restarts the host and recovers logs', (await json(['logs', '1'])).entries.length === 1);
+  for (let attempt = 0; attempt < 100 && existsSync(join(environment.HUMAN_CLI_DATA_DIR, 'runtime.json')); attempt++) await new Promise((done) => setTimeout(done, 50));
+  check('Read-only packaged query leaves no resident desktop', !existsSync(join(environment.HUMAN_CLI_DATA_DIR, 'runtime.json')));
   writeFileSync(join(directory, 'acceptance.json'), JSON.stringify({ passed: checks.length, checks, executable, nodeAvailableInChildPath: false }, null, 2));
   console.log(`PACKAGED CLI PASS ${checks.length} checks ${directory}`);
 } finally {

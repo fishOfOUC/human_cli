@@ -41,6 +41,10 @@
 
 `spiVersion` 是网络协议版本；`apiVersion` 是插件清单/结果约定版本。插件 id 全局唯一；side 为 left/right；未知图标回退为拼图。当前一个提供者最多暴露 100 个插件。不兼容或不可达的提供者单独报告，不阻止内置服务启动。
 
+## 可选自定义配置界面
+
+清单可以声明 configUi: {"type":"web","path":"/ui/settings"}，并实现 spi.ui.open、spi.ui.status、spi.ui.resolve、spi.ui.close。未声明时按 type=schema 生成现有表单。执行作业仍使用以下五个原有方法，自定义 UI 不改变左键直接执行的语义。完整协议见 [CONFIG-UI.md](CONFIG-UI.md)。
+
 ## 开始作业
 
 ```json
