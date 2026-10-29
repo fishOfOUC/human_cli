@@ -1,6 +1,6 @@
 import { BrowserWindow, screen } from 'electron';
 import { join } from 'node:path';
-import { restoreBounds, stableBounds } from './geometry.mjs';
+import { restoreBounds, stableBounds, resizeEdges, resizeFromEdge } from './geometry.mjs';
 
 export class WindowManager {
   constructor(root, store) { this.root = root; this.store = store; this.windows = new Map(); this.quitting = false; this.captureActive = false; }
@@ -44,12 +44,42 @@ export class WindowManager {
       this.store.save();
     };
     win.flushGeometry = () => { if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; persistGeometry(); } };
+    win.persistGeometry = persistGeometry;
     const saveGeometry = () => {
       if (restoring) return;
       clearTimeout(saveTimer); saveTimer = setTimeout(() => { saveTimer = null; persistGeometry(); }, 180);
     };
     win.on('move', saveGeometry); win.on('resize', saveGeometry);
     return win;
+  }
+  beginResize(win, edge) {
+    if (!resizeEdges.includes(edge) || win.isMinimized() || win.isMaximized()) throw new Error('当前无法调整窗口大小。');
+    const bounds = win.getBounds();
+    win.resizeSession = { edge, bounds, pointer: screen.getCursorScreenPoint(), area: screen.getDisplayMatching(bounds).workArea };
+  }
+  resize(win) {
+    const drag = win.resizeSession; if (!drag) return;
+    const point = screen.getCursorScreenPoint(), { bounds, edge, area } = drag;
+    const target = resizeFromEdge(bounds, edge, point.x - drag.pointer.x, point.y - drag.pointer.y, {
+      maxWidth: Math.min(1600, edge.includes('w') ? bounds.x + bounds.width - area.x : area.x + area.width - bounds.x),
+      maxHeight: Math.min(1200, edge.includes('n') ? bounds.y + bounds.height - area.y : area.y + area.height - bounds.y),
+    });
+    // Compensate Windows' frameless DPI rounding while preserving the opposite edge.
+    let requested = { ...target };
+    for (let i = 0; i < 3; i++) {
+      win.setBounds(requested);
+      const actual = win.getBounds();
+      if (Object.keys(target).every((key) => actual[key] === target[key])) break;
+      requested = Object.fromEntries(Object.entries(requested).map(([key, value]) => [key, value + target[key] - actual[key]]));
+    }
+    const actual = win.getBounds();
+    if ((edge.includes('w') && actual.width !== target.width) || (edge.includes('n') && actual.height !== target.height)) {
+      win.setPosition(edge.includes('w') ? bounds.x + bounds.width - actual.width : actual.x, edge.includes('n') ? bounds.y + bounds.height - actual.height : actual.y);
+    }
+  }
+  endResize(win) {
+    if (!win.resizeSession) return;
+    this.resize(win); delete win.resizeSession; win.persistGeometry();
   }
   finish(requestId) {
     const win = this.windows.get(requestId); if (!win || win.isDestroyed()) return;
@@ -61,6 +91,7 @@ export class WindowManager {
   forSender(sender) { return [...this.windows.values()].find((win) => win.webContents === sender && !win.isDestroyed()); }
   displayChanged() {
     for (const win of this.windows.values()) {
+      delete win.resizeSession;
       const display = screen.getDisplayMatching(win.getBounds());
       win.setBounds(restoreBounds({ bounds: win.getBounds(), displayId: display.id }, screen.getAllDisplays(), screen.getPrimaryDisplay().id));
     }

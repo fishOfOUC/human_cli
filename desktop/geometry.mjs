@@ -1,4 +1,19 @@
 const intersect = (a, b) => Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
+export const resizeEdges = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
+export function resizeFromEdge(bounds, edge, dx, dy, { minWidth = 340, minHeight = 300, maxWidth = 1600, maxHeight = 1200 } = {}) {
+  if (!resizeEdges.includes(edge) || !Number.isFinite(dx) || !Number.isFinite(dy)) throw new Error('无效的窗口缩放方向或距离。');
+  const clamp = (value, min, max) => Math.round(Math.max(min, Math.min(Math.max(min, max), value)));
+  const next = { ...bounds };
+  if (edge.includes('e') || edge.includes('w')) {
+    next.width = clamp(bounds.width + (edge.includes('w') ? -dx : dx), minWidth, maxWidth);
+    if (edge.includes('w')) next.x = bounds.x + bounds.width - next.width;
+  }
+  if (edge.includes('n') || edge.includes('s')) {
+    next.height = clamp(bounds.height + (edge.includes('n') ? -dy : dy), minHeight, maxHeight);
+    if (edge.includes('n')) next.y = bounds.y + bounds.height - next.height;
+  }
+  return next;
+}
 export function stableBounds(bounds, scaleFactor) {
   // Whole physical pixels can map to fractional DIP at 125/150/175% scaling.
   // Persist a representable grid so rounding cannot grow a window on every restore.

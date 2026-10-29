@@ -148,7 +148,8 @@ export class RequestService extends EventEmitter {
   preferences(patch) {
     if (patch.theme !== undefined) fail(themes.includes(patch.theme), 'E_THEME', '未知主题。');
     if (patch.pinned !== undefined) fail(typeof patch.pinned === 'boolean', 'E_PIN', '置顶值必须为布尔值。');
-    Object.assign(this.store.data.preferences, { ...(patch.theme !== undefined ? { theme: patch.theme } : {}), ...(patch.pinned !== undefined ? { pinned: patch.pinned } : {}) });
+    if (patch.motion !== undefined) fail(typeof patch.motion === 'boolean', 'E_MOTION', '动效值必须为布尔值。');
+    Object.assign(this.store.data.preferences, { ...(patch.theme !== undefined ? { theme: patch.theme } : {}), ...(patch.pinned !== undefined ? { pinned: patch.pinned } : {}), ...(patch.motion !== undefined ? { motion: patch.motion } : {}) });
     this.store.save(); this.emit('preferences', this.store.data.preferences); return this.store.data.preferences;
   }
   configure(id, toolId, config) {

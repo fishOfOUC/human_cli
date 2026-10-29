@@ -8,7 +8,8 @@ const output = join(root, 'release', new Date().toISOString().replace(/[:.]/g, '
 const paths = await packager({
   dir: root, name: 'human_cli', platform: 'win32', arch: 'x64', out: output,
   asar: false, prune: true, overwrite: false,
-  ignore: [/^\/(\.git|\.qa|\.taste-skill|prototype|tests|release)(\/|$)/, /^\/src(\/|$)/],
+  // Ship the runtime; keep design references, tests and development launchers in source only.
+  ignore: [/^\/(\.git|\.qa|\.taste-skill|prototype|tests|release|ui__rebuild|scripts)(\/|$)/, /^\/src(\/|$)/, /^\/[^/]+\.(cmd|ps1)$/i],
   win32metadata: { CompanyName: 'human_cli', FileDescription: 'human_cli AI 协助便签', ProductName: 'human_cli' },
 });
 for (const path of paths) {

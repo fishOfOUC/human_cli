@@ -2,9 +2,21 @@ param([string]$PreviewDirectory)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 if (!$PreviewDirectory) {
-    $pointer = Get-Content -LiteralPath (Join-Path $repo 'release/config-ui-preview.json') -Raw | ConvertFrom-Json
-    $PreviewDirectory = $pointer.directories[0]
+    $candidates = foreach ($pointerFile in @('release/ui-rebuild-preview.json','release/config-ui-preview.json','release/latest.json')) {
+        $path = Join-Path $repo $pointerFile
+        if (Test-Path -LiteralPath $path) {
+            try {
+                $pointer = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+                foreach ($directory in $pointer.directories) {
+                    if ((Test-Path -LiteralPath (Join-Path $directory 'human_cli.exe')) -and (Test-Path -LiteralPath (Join-Path $directory 'human_cli-desktop.exe'))) { $directory }
+                }
+            } catch { }
+        }
+    }
+    # Generated directory names are ISO timestamps. Prefer the newest available build.
+    $PreviewDirectory = $candidates | Sort-Object -Descending -Unique | Select-Object -First 1
 }
+if (!$PreviewDirectory) { throw '请先在项目根目录运行 npm run package，或通过 -PreviewDirectory 指定本地构建目录。' }
 $cli = Join-Path $PreviewDirectory 'human_cli.exe'
 $desktop = Join-Path $PreviewDirectory 'human_cli-desktop.exe'
 if (!(Test-Path -LiteralPath $cli) -or !(Test-Path -LiteralPath $desktop)) { throw '请先准备含配置界面功能的本地预览版。' }

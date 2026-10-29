@@ -1,14 +1,13 @@
-import '@fontsource-variable/dm-sans';
 import { $, esc, icon, refreshIcons } from './ui.js';
-import { railHTML, panelHTML } from './views.js';
+import { railHTML, panelHTML, draftLabels, progressHTML } from './views.js';
 import { applyTheme } from './themes.js';
 import './style.css';
 import './desktop.css';
 
 const bridge = window.humanCli;
-const local = { pane: 'note', reply: '', checks: [], requestId: null, version: null, configDrafts: {}, openSettings: new Set(), toolTabs: {} };
+const local = { pane: 'note', reply: '', checks: [], requestId: null, version: null, configDrafts: {}, openSettings: new Set(), toolTabs: {}, draftState: 'idle' };
 let state, draftTimer, toastTimer, draftChain = Promise.resolve(), completing = false;
-$('#app').innerHTML = `<main class="note-window" aria-label="AI 协助便签"><header class="window-titlebar"><div class="window-identity">${icon('bot')}<span id="agent-name">human_cli</span></div><div class="window-controls"><button class="icon-button" data-action="pane" data-pane="settings" aria-label="便签主题" title="便签主题">${icon('settings')}</button><button class="icon-button pin-control" data-action="pin" aria-label="切换置顶" title="切换置顶">${icon('pin')}</button><button class="icon-button" data-action="hide" aria-label="最小化到任务栏" title="最小化到任务栏，AI 请求继续等待">${icon('minus')}</button></div></header><div class="note-body"></div><div class="resize-handle" data-resize aria-label="拖动调整大小">${icon('grip')}</div><div class="note-toast" role="status" aria-live="polite"></div></main><input id="image-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden />`;
+$('#app').innerHTML = `<main class="note-window" aria-label="AI 协助便签"><header class="window-titlebar"><div class="window-identity">${icon('sticky-note')}<span id="agent-name">human_cli</span></div><div class="window-controls"><button class="icon-button pin-control" data-action="pin" aria-label="切换置顶" title="切换置顶">${icon('pin')}</button><button class="icon-button" data-action="hide" aria-label="最小化到任务栏" title="最小化到任务栏，AI 请求继续等待">${icon('minus')}</button></div></header><div class="note-body"></div>${['n','s','e','w','ne','nw','se','sw'].map(edge => `<div class="resize-edge ${edge}" data-resize-edge="${edge}" aria-hidden="true"></div>`).join('')}<div class="note-toast" role="status" aria-live="polite"></div></main><input id="image-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden />`;
 
 function toast(text) {
   clearTimeout(toastTimer); $('.note-toast').textContent = text; $('.note-toast').classList.add('visible');
@@ -23,7 +22,7 @@ function receive(next) {
   const request = next.request;
   if (request?.id !== local.requestId) {
     local.reply = request?.reply || ''; local.checks = request?.checks || [];
-    local.requestId = request?.id || null; local.version = request?.version; local.pane = 'note';
+    local.requestId = request?.id || null; local.version = request?.version; local.pane = 'note'; local.draftState = 'idle';
   } else if (request?.version !== local.version) {
     local.version = request.version; local.checks = [...request.checks];
     if (request.status !== 'pending') local.pane = 'note';
@@ -33,6 +32,7 @@ function receive(next) {
 function render() {
   if (!state) return;
   applyTheme(state.preferences.theme);
+  document.documentElement.classList.toggle('motion-off', state.preferences.motion === false);
   const focused = document.activeElement, focusId = focused?.id, hadFocus = document.hasFocus();
   const selection = typeof focused?.selectionStart === 'number' ? [focused.selectionStart, focused.selectionEnd] : null;
   const oldPane = $('#shared-panel')?.dataset.pane, scroll = $('.pane-scroll')?.scrollTop || 0;
@@ -41,6 +41,7 @@ function render() {
   $('#agent-name').textContent = request?.agent || 'human_cli';
   $('.pin-control').innerHTML = icon(state.preferences.pinned ? 'pin' : 'pin-off');
   $('.pin-control').setAttribute('aria-pressed', String(state.preferences.pinned));
+  updateDraftStatus();
   refreshIcons();
   if (oldPane === local.pane) {
     const replacement = focusId && document.getElementById(focusId);
@@ -81,22 +82,27 @@ function saveDraft() {
   clearTimeout(draftTimer);
   if (!state.request || state.request.status !== 'pending') return draftChain;
   const payload = { reply: local.reply, checks: [...local.checks] };
+  local.draftState = 'saving'; updateDraftStatus();
   draftChain = draftChain.catch(() => {}).then(() => call('draft', payload));
-  draftChain = draftChain.catch((error) => { toast(error.message); throw error; });
+  draftChain = draftChain.then(() => { if (payload.reply === local.reply && JSON.stringify(payload.checks) === JSON.stringify(local.checks)) local.draftState = 'saved'; updateDraftStatus(); });
+  draftChain = draftChain.catch((error) => { local.draftState = 'error'; updateDraftStatus(); toast(error.message); throw error; });
   return draftChain;
+}
+function updateDraftStatus() {
+  const label = $('#draft-state'); if (label) label.textContent = draftLabels[local.draftState];
 }
 function scheduleDraft() {
   clearTimeout(draftTimer);
+  local.draftState = 'saving'; updateDraftStatus();
   draftTimer = setTimeout(() => { saveDraft().catch(() => { draftChain = Promise.resolve(); }); }, 200);
 }
-async function finish(only = false) {
+async function finish() {
   if (completing || state.request?.status !== 'pending') return;
   const version = state.request.version;
   completing = true;
   try {
     await saveDraft();
-    await call('complete', { version, only, reply: local.reply, checks: local.checks });
-
+    await call('complete', { version, reply: local.reply, checks: local.checks });
   } finally { completing = false; }
 }
 async function addFiles(files) {
@@ -111,6 +117,7 @@ const actions = {
   pane: (button) => pane(button.dataset.pane),
   hide: () => call('hide'), pin: () => call('preferences', { pinned: !state.preferences.pinned }),
   theme: (button) => call('preferences', { theme: button.dataset.theme }),
+  motion: () => call('preferences', { motion: state.preferences.motion === false }),
   run: async (button) => { await call('runTool', button.dataset.tool); },
   upload: () => $('#image-input').click(),
   image: (button) => pane(`image:${button.dataset.id}`),
@@ -121,8 +128,6 @@ const actions = {
   'copy-error': async (button) => { const error = state.request.tools.find((t) => t.id === button.dataset.id).error; await call('copyText', `${error.code}\n${error.message}\n${error.details || ''}`); toast('完整错误已复制'); },
   save: async (button) => { if (await call('saveResult', button.dataset.id)) toast('结果已保存'); },
   complete: () => finish(),
-  only: () => { if (local.reply.trim() || state.request.images.length || state.request.diagnostics.length) pane('confirm-only'); else return finish(true); },
-  'confirm-only': () => finish(true),
   'open-config-ui': (button) => openToolPanel(button.dataset.tool),
   'tool-tab': async (button) => {
     if (button.dataset.tab === 'config') return openToolPanel(button.dataset.tool);
@@ -159,7 +164,13 @@ document.addEventListener('change', (event) => {
   if (event.target.matches('[data-step]')) {
     const n = Number(event.target.dataset.step);
     local.checks = event.target.checked ? [...new Set([...local.checks, n])] : local.checks.filter((i) => i !== n);
-    event.target.closest('label').classList.toggle('checked', event.target.checked); scheduleDraft();
+    const row = event.target.closest('.check-row');
+    row.classList.toggle('done', event.target.checked);
+    row.classList.toggle('just-checked', event.target.checked);
+    setTimeout(() => row.classList.remove('just-checked'), 320);
+    const progress = $('.progress-row');
+    if (progress) progress.outerHTML = progressHTML({ ...state.request, checks: local.checks });
+    scheduleDraft();
   }
   if (event.target.id === 'image-input') { const files = [...event.target.files]; event.target.value = ''; execute(() => addFiles(files)); }
   const form = event.target.closest('.tool-settings-form'); if (form) { try { local.configDrafts[form.dataset.id] = configDraft(form); } catch {} }
@@ -192,14 +203,30 @@ document.addEventListener('paste', (event) => {
 });
 document.addEventListener('dragover', (event) => { if ([...(event.dataTransfer?.types || [])].includes('Files')) event.preventDefault(); });
 document.addEventListener('drop', (event) => { event.preventDefault(); if (event.dataTransfer?.files.length) execute(() => addFiles([...event.dataTransfer.files])); });
-let resize;
-$('[data-resize]').addEventListener('pointerdown', (event) => {
-  if (event.button !== 0) return; resize = { x: event.screenX, y: event.screenY, width: innerWidth, height: innerHeight };
-  event.target.closest('[data-resize]').setPointerCapture(event.pointerId);
+let resize, resizeFrame;
+document.addEventListener('pointerdown', (event) => {
+  const edge = event.target.closest('[data-resize-edge]');
+  if (!edge || event.button !== 0 || resize || !bridge) return;
+  event.preventDefault(); edge.setPointerCapture(event.pointerId);
+  const drag = { edge, pointerId: event.pointerId, ready: call('beginResize', edge.dataset.resizeEdge) };
+  resize = drag;
+  drag.ready.catch((error) => { if (resize === drag) resize = null; toast(error.message); });
 });
-document.addEventListener('pointermove', (event) => { if (resize) execute(() => call('resize', { width: resize.width + event.screenX - resize.x, height: resize.height + event.screenY - resize.y })); });
-document.addEventListener('pointerup', () => { resize = null; });
-document.addEventListener('pointercancel', () => { resize = null; });
+document.addEventListener('pointermove', (event) => {
+  if (!resize || event.pointerId !== resize.pointerId || resizeFrame) return;
+  resizeFrame = requestAnimationFrame(() => {
+    resizeFrame = null; const drag = resize;
+    if (drag) execute(async () => { await drag.ready; if (resize === drag) await call('resize'); });
+  });
+});
+function endResize(event) {
+  if (!resize || event.pointerId !== resize.pointerId) return;
+  const drag = resize; resize = null;
+  cancelAnimationFrame(resizeFrame); resizeFrame = null;
+  if (drag.edge.hasPointerCapture(event.pointerId)) drag.edge.releasePointerCapture(event.pointerId);
+  execute(async () => { await drag.ready; await call('endResize'); });
+}
+for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) document.addEventListener(event, endResize);
 new ResizeObserver(() => requestAnimationFrame(syncConfigBounds)).observe($('.note-window'));
 refreshIcons();
 if (!bridge) {

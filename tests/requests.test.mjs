@@ -82,15 +82,17 @@ test('late plugin output cannot change completed reply or attach to updated inst
 });
 test('restart restores requests, images, themes and marks interrupted workers', (t) => {
   const { service, store, plugins, directory } = fixture(t), r = service.create({ title: 'x' });
-  service.preferences({ theme: 'dark', pinned: false });
+  service.preferences({ theme: 'dark', pinned: false, motion: false });
   service.addImage(r.id, { name: 'x.png', mime: 'image/png', bytes: png });
   service.get(r.id).tools[0].state = 'running'; store.save();
   const reopened = new JsonStore(directory), restored = new RequestService(reopened, new AttachmentStore(reopened), plugins);
   assert.equal(reopened.data.preferences.theme, 'dark'); assert.equal(restored.snapshot(r.id).images.length, 1);
+  assert.equal(reopened.data.preferences.motion, false);
   assert.equal(restored.snapshot(r.id).tools[0].error.code, 'E_INTERRUPTED');
   assert.match(readFileSync(join(directory, 'state.json'), 'utf8'), /已中断|中断/);
 });
 test('invalid preferences and duplicate binding IDs are rejected', (t) => {
   const { service } = fixture(t); assert.throws(() => service.preferences({ theme: 'pink' }), /未知主题/);
+  assert.throws(() => service.preferences({ motion: 'false' }), /动效值必须为布尔值/);
   assert.throws(() => service.create({ title: 'x', plugins: [{ id: 'same', plugin: 'human.screenshot' }, { id: 'same', plugin: 'human.screenshot' }] }), /不能重复/);
 });

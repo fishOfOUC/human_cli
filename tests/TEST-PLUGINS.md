@@ -1,6 +1,8 @@
 # 三种本地验收插件
 
-在项目根目录执行（默认使用 `release/config-ui-preview.json` 指定的本地预览版）：
+双击项目根目录的 `查看界面.cmd`，即可打开最新已生成的本地验收界面，带三个测试插件。完成后便签消失，脚本结束。
+
+在项目根目录执行（从 release 下的构建记录选择最新可用本地构建；首次使用前运行 npm run package）：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tests/Start-TestPlugins.ps1

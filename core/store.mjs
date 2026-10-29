@@ -6,7 +6,7 @@ export class JsonStore {
     mkdirSync(directory, { recursive: true });
     this.directory = directory; this.path = join(directory, 'state.json');
     this.data = existsSync(this.path) ? JSON.parse(readFileSync(this.path, 'utf8')) : {
-      schemaVersion: 1, requests: {}, attachments: {}, preferences: { theme: 'paper', pinned: true }, pluginDefaults: {}, geometry: null,
+      schemaVersion: 1, requests: {}, attachments: {}, preferences: { theme: 'light', pinned: true, motion: true }, pluginDefaults: {}, geometry: null,
     };
     if (this.data.schemaVersion !== 1) throw new Error('不支持的数据版本，请先备份数据再升级。');
   }

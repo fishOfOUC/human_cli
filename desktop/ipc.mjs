@@ -19,12 +19,9 @@ export function registerIpc(service, windows, configUis) {
         case 'bootstrap': return { ok: true, value: state(win) };
         case 'hide': void configUis?.close(win); win.minimize(); break;
         case 'preferences': service.preferences(data); break;
-        case 'resize': {
-          const b = win.getBounds();
-          fail(Number.isFinite(data.width) && Number.isFinite(data.height), 'E_BOUNDS', '无效的窗口尺寸。');
-          win.setBounds({ ...b, width: Math.max(340, Math.min(1600, Math.round(data.width))), height: Math.max(300, Math.min(1200, Math.round(data.height))) });
-          windows.displayChanged(); break;
-        }
+        case 'beginResize': windows.beginResize(win, data.edge); break;
+        case 'resize': windows.resize(win); break;
+        case 'endResize': windows.endResize(win); break;
         case 'copyText': fail(typeof data.text === 'string' && data.text.length <= 100000, 'E_CLIPBOARD', '复制内容无效。'); clipboard.writeText(data.text); break;
         case 'draft': needRequest(); service.draft(id, data); break;
         case 'complete': needRequest(); service.complete(id, data); break;

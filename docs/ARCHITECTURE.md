@@ -72,7 +72,7 @@ AI 更新说明增加 version，用户完成携带看到的版本；idempotencyK
 
 保存正常窗口 bounds、显示器 ID、工作区和 scaleFactor。Electron 坐标已是 DIP，不重复乘 DPI。显示器断开时按交集或主屏恢复，夹到工作区；监听显示器增减与度量变化。Windows 初次无边框调整被校正，尺寸落在可表示 DPI 网格，避免反复恢复时累积变大。
 
-Windows 截图使用 Electron 提供的物理显示器矩形和固定 System.Drawing 桥，执行前隐藏所有便签，结束后恢复。其他平台保留 desktopCapturer 能力实现，但发行和原生验收当前针对 Windows。四种主题通过语义颜色变量切换，持久化并广播到所有窗口。
+Windows 截图使用 Electron 提供的物理显示器矩形和固定 System.Drawing 桥，执行前隐藏所有便签，结束后恢复。其他平台保留 desktopCapturer 能力实现，但发行和原生验收当前针对 Windows。四种主题通过语义颜色变量切换，持久化并广播到所有窗口。界面已迁移用户提供的新稿，并保留原来的小便签默认尺寸；详见 [UI-REBUILD.md](UI-REBUILD.md)。
 
 ## 数据
 

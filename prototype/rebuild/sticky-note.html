@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="oklch(96% 0.006 240)">
+<title>便签 · 本机验收</title>
+<style>
+:root {
+  --bg:      oklch(99% 0.002 240);
+  --surface: oklch(100% 0 0);
+  --fg:      oklch(18% 0.012 250);
+  --muted:   oklch(54% 0.012 250);
+  --border:  oklch(92% 0.005 250);
+  --accent:  oklch(58% 0.18 255);
+  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+  --font-body:    -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  --ground: oklch(96% 0.006 240);
+  --frame: oklch(97% 0.005 240);
+  --raised: oklch(96.5% 0.004 240);
+  --control: oklch(72% 0.012 250);
+  --accent-ink: oklch(42% 0.16 255);
+  --accent-soft: oklch(95% 0.024 255);
+  --negative: oklch(44% 0.16 25);
+  --ease: cubic-bezier(.22,1,.36,1);
+  --radius: 16px;
+}
+/* App foundation: tasteskill app.css reset, controls, rows and responsive sheet.
+   Grid: 560px paper + 12px gutter + 52px tool rail = 624px desktop workspace. */
+*,*::before,*::after { box-sizing:border-box; }
+html { -webkit-text-size-adjust:100%; }
+body { margin:0; min-width:300px; background:var(--ground); color:var(--fg); font:14px/1.6 var(--font-body); -webkit-font-smoothing:antialiased; }
+h1,h2,h3,p,ol,ul { margin:0; }
+button,input,textarea,select { font:inherit; color:inherit; }
+button { cursor:pointer; }
+button,textarea,input,select { -webkit-tap-highlight-color:transparent; }
+button { border:0; }
+button:disabled { cursor:default; opacity:.5; }
+svg { width:18px; height:18px; display:block; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
+:focus-visible { outline:2px solid var(--accent-ink); outline-offset:4px; }
+[hidden] { display:none!important; }
+::selection { color:var(--fg); background:var(--accent-soft); }
+.workspace-head { padding:28px 40px; display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.brand { display:flex; align-items:center; gap:10px; font-size:16px; font-weight:650; letter-spacing:.02em; }
+.brand svg { width:23px; height:23px; }
+.scope { display:flex; align-items:center; gap:12px; color:var(--muted); font-size:12px; }
+.scope .divider { width:1px; height:12px; background:var(--control); }
+.stage { min-height:calc(100svh - 146px); display:flex; align-items:center; justify-content:center; padding:24px 24px 40px; }
+.note-group { width:624px; max-width:100%; display:grid; grid-template-columns:minmax(0,560px) 52px; align-items:start; gap:12px; position:relative; }
+.note-window { background:var(--frame); border:1px solid var(--border); border-radius:20px; padding:0 8px 8px; min-width:0; position:relative; }
+.window-head { height:56px; display:flex; align-items:center; justify-content:space-between; padding:0 7px 0 14px; gap:8px; }
+.window-name { display:flex; align-items:center; gap:9px; font-size:13px; font-weight:550; }
+.window-name svg { width:16px; height:16px; }
+.window-actions { display:flex; align-items:center; gap:2px; }
+.icon-button { width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; background:transparent; color:var(--muted); border-radius:8px; position:relative; transition:background .16s,color .16s,transform .2s var(--ease); }
+.icon-button:hover { background:var(--border); color:var(--fg); }
+.icon-button:active { transform:scale(.91); }
+.icon-button[aria-pressed="true"] { background:var(--border); color:var(--fg); }
+.pin svg { transition:transform .35s var(--ease); transform:rotate(-35deg); }
+.pin[aria-pressed="true"] svg { transform:rotate(0); }
+.tip { position:absolute; padding:5px 9px; border-radius:6px; background:var(--fg); color:var(--surface); font-size:12px; font-weight:400; white-space:nowrap; pointer-events:none; opacity:0; z-index:15; transform:translateY(4px); transition:opacity .15s,transform .15s; bottom:calc(100% + 8px); left:50%; translate:-50% 0; }
+button:hover>.tip,button:focus-visible>.tip { opacity:1; transform:translateY(0); }
+.paper { border:1px solid var(--border); background:var(--surface); border-radius:var(--radius); overflow:clip; }
+.note-body { padding:24px 26px 0; }
+.meta-row { display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:12px; color:var(--muted); }
+.local-label { display:flex; align-items:center; gap:6px; }
+.local-label svg { width:13px; height:13px; }
+.ai-status { display:flex; align-items:center; gap:7px; color:var(--accent-ink); }
+.status-dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+h1 { margin-top:17px; font:650 28px/1.35 var(--font-display); letter-spacing:-.025em; text-wrap:balance; }
+.description { color:var(--muted); margin-top:8px; font-size:13px; }
+.progress-row { display:flex; align-items:center; gap:14px; margin-top:20px; font-size:12px; font-variant-numeric:tabular-nums; }
+.progress-track { height:3px; background:var(--border); border-radius:4px; flex:1; overflow:hidden; }
+.progress-fill { height:100%; width:0; background:var(--accent); transition:width .45s var(--ease); }
+.progress-copy { color:var(--muted); }
+.checklist { padding:0; list-style:none; margin:12px -10px 0; }
+.check-row { position:relative; display:flex; align-items:center; border-radius:8px; min-height:64px; transition:background .17s; }
+.check-row:hover { background:var(--raised); }
+.check-label { min-width:0; flex:1; display:flex; align-items:flex-start; gap:13px; padding:10px 10px; cursor:pointer; }
+.check-box { width:20px; height:20px; margin-top:2px; flex:none; position:relative; }
+.check-box input { position:absolute; inset:-8px; width:36px; height:36px; margin:0; opacity:0; cursor:pointer; }
+.check-visual { width:20px; height:20px; border:1.5px solid var(--control); border-radius:5px; display:grid; place-items:center; transition:background .18s,border-color .18s,transform .25s var(--ease); pointer-events:none; }
+.check-visual svg { width:14px; height:14px; stroke-dasharray:19; stroke-dashoffset:19; transition:stroke-dashoffset .3s .04s; }
+.check-box input:checked + .check-visual { background:var(--fg); color:var(--surface); border-color:var(--fg); animation:check-pop .3s var(--ease); }
+.check-box input:checked + .check-visual svg { stroke-dashoffset:0; }
+.check-box input:focus-visible + .check-visual { outline:2px solid var(--accent-ink); outline-offset:4px; }
+.check-copy { display:grid; gap:2px; min-width:0; }
+.check-title { font-size:14px; font-weight:550; position:relative; width:fit-content; }
+.check-title::after { position:absolute; content:""; height:1px; background:var(--fg); left:0; top:54%; width:100%; transform:scaleX(0); transform-origin:left; transition:transform .3s var(--ease); }
+.check-row.done .check-title::after { transform:scaleX(1); }
+.check-detail { font-size:12px; color:var(--muted); overflow-wrap:anywhere; }
+.row-tool { width:44px; height:44px; flex:none; opacity:0; transition:opacity .15s,transform .15s; margin-right:4px; }
+.check-row:hover .row-tool,.row-tool:focus-visible { opacity:1; }
+.row-tool svg { width:16px; height:16px; }
+.task-link-row { display:flex; justify-content:flex-end; margin:4px -8px 8px; }
+.text-button { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:44px; padding:0 8px; background:transparent; border-radius:8px; font-size:12px; color:var(--muted); transition:background .16s,color .16s,transform .16s; }
+.text-button:hover { background:var(--raised); color:var(--fg); }
+.text-button:active { transform:translateY(1px); }
+.text-button svg { width:14px; height:14px; }
+.composer { margin:0 20px; padding:12px 16px 8px; background:var(--bg); border:1px solid var(--border); border-radius:12px; transition:border-color .2s; }
+.composer:focus-within { border-color:var(--accent-ink); }
+.composer-label { display:flex; align-items:center; justify-content:space-between; font-size:12px; font-weight:550; }
+.draft-state { font-size:11px; font-weight:400; color:var(--muted); }
+textarea { display:block; width:100%; min-height:64px; max-height:200px; resize:vertical; background:transparent; border:0; padding:9px 0; outline:none; font-size:13px; line-height:1.8; }
+textarea::placeholder,input::placeholder { color:var(--muted); opacity:1; }
+textarea:focus-visible { outline:2px solid var(--accent-ink); outline-offset:2px; border-radius:4px; }
+.compose-tools { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-left:-8px; }
+.compose-hint { color:var(--muted); font-size:11px; }
+.attachment-list { display:flex; gap:8px; flex-wrap:wrap; }
+.attachment { display:flex; align-items:center; gap:8px; width:100%; border-top:1px solid var(--border); padding:9px 0; font-size:12px; }
+.attachment img { width:40px; height:auto; max-height:64px; object-fit:contain; border-radius:4px; }
+.attachment span { flex:1; min-width:0; overflow-wrap:anywhere; }
+.attachment button { flex:none; }
+.note-footer { padding:16px 20px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.complete-only { color:var(--fg); font-size:13px; }
+.primary { min-height:44px; border-radius:8px; padding:0 17px; color:var(--surface); background:var(--fg); display:flex; align-items:center; justify-content:center; gap:9px; font-size:13px; font-weight:550; transition:background .18s,transform .18s var(--ease); }
+.primary:hover { background:oklch(from var(--fg) calc(l - .08) c h); color:var(--surface); }
+.primary:active { transform:scale(.97); }
+.primary .send-icon { width:16px; height:16px; transition:transform .28s var(--ease); }
+.primary:hover .send-icon { transform:translate(2px,-2px); }
+.tool-rail { padding:6px 4px; background:var(--frame); border:1px solid var(--border); border-radius:12px; display:flex; flex-direction:column; gap:4px; margin-top:65px; }
+.rail-button { width:42px; height:44px; }
+.rail-button[aria-current="page"] { background:var(--surface); color:var(--fg); }
+.rail-button .tip { bottom:auto; left:calc(100% + 14px); top:50%; translate:0 -50%; transform:translateX(-4px); }
+.rail-button:hover .tip,.rail-button:focus-visible .tip { transform:translateX(0); }
+.rail-separator { height:1px; margin:4px 8px; background:var(--border); }
+.bottom-status { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 14px 0; font-size:11px; color:var(--muted); }
+.saved-label { display:flex; align-items:center; gap:5px; }
+.saved-label svg { width:13px; height:13px; }
+.keyboard-note { text-align:center; font-size:11px; color:var(--muted); padding:0 20px 20px; }
+kbd { font:inherit; }
+.drawer { position:absolute; inset:56px 8px 8px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); z-index:5; padding:24px; overflow-y:auto; animation:drawer-in .3s var(--ease); }
+.drawer-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.drawer h2 { font-size:20px; font-weight:650; }
+.drawer-sub { color:var(--muted); font-size:13px; margin-bottom:22px; }
+.tool-card { padding:16px 0; border-top:1px solid var(--border); }
+.tool-card:first-of-type { border-top:0; }
+.tool-card h3 { font-size:14px; font-weight:550; }
+.tool-card p { color:var(--muted); font-size:12px; margin:6px 0; }
+.tool-card .actions { display:flex; align-items:center; justify-content:space-between; margin-top:10px; }
+.outline-button { min-height:44px; padding:0 13px; border-radius:8px; background:var(--surface); border:1px solid var(--control); font-size:12px; transition:background .16s,transform .16s; }
+.outline-button:hover { background:var(--raised); color:var(--fg); }
+.outline-button:active { transform:scale(.97); }
+.tool-output { font-size:12px; background:var(--raised); padding:12px; border-radius:8px; margin-top:12px; color:var(--fg); }
+.tool-output pre { font-family:Consolas,monospace; font-size:12px; white-space:pre-wrap; overflow-wrap:anywhere; margin:6px 0 0; }
+.settings-row { padding:16px 0; display:flex; align-items:center; justify-content:space-between; gap:18px; border-top:1px solid var(--border); }
+.settings-row strong { display:block; font-size:14px; font-weight:550; }
+.settings-row p { font-size:12px; color:var(--muted); margin-top:3px; }
+.switch { width:44px; height:44px; border:0; padding:0; background:transparent; flex:none; position:relative; }
+.switch::before { content:""; position:absolute; width:38px; height:24px; left:3px; top:10px; border-radius:99px; background:var(--control); transition:background .2s; }
+.switch::after { content:""; position:absolute; left:6px; top:13px; width:18px; height:18px; border-radius:50%; background:var(--surface); transition:transform .3s var(--ease); }
+.switch[aria-checked="true"]::before { background:var(--fg); }
+.switch[aria-checked="true"]::after { transform:translateX(14px); }
+.history-entry { padding:15px 0; border-top:1px solid var(--border); }
+.history-entry time { display:block; color:var(--muted); font-size:11px; margin-bottom:5px; }
+.history-entry p { font-size:13px; overflow-wrap:anywhere; white-space:pre-wrap; }
+.empty { padding:30px 0; color:var(--muted); font-size:13px; }
+.details-list { display:grid; grid-template-columns:80px minmax(0,1fr); gap:16px; font-size:13px; }
+.details-list dt { color:var(--muted); }
+.details-list dd { margin:0; }
+.mini-window { padding:16px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.mini-window strong { font-weight:550; }
+.mini-meta { color:var(--muted); font-size:12px; }
+.toast { position:fixed; z-index:30; bottom:24px; left:50%; width:max-content; max-width:calc(100% - 32px); translate:-50% 0; padding:12px 18px; border:1px solid var(--border); background:var(--surface); color:var(--fg); box-shadow:0 8px 24px oklch(from var(--fg) l c h / .1); border-radius:10px; font-size:13px; animation:toast-in .25s var(--ease); }
+dialog { border:1px solid var(--border); border-radius:16px; padding:26px; width:calc(100% - 40px); max-width:400px; color:var(--fg); background:var(--surface); }
+dialog::backdrop { background:oklch(from var(--fg) l c h / .24); }
+dialog h2 { font-size:20px; }
+dialog p { color:var(--muted); font-size:13px; margin:10px 0 22px; }
+.dialog-actions { display:flex; justify-content:flex-end; gap:8px; }
+.field { display:grid; gap:8px; margin:16px 0; font-size:13px; }
+.field input { width:100%; height:44px; border:1px solid var(--control); border-radius:8px; padding:0 12px; background:var(--surface); }
+@keyframes check-pop { 50%{ transform:scale(1.16); } }
+@keyframes drawer-in { from{opacity:0;transform:translateX(16px)} to{opacity:1;transform:translateX(0)} }
+@keyframes toast-in { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+.motion-off *,.motion-off *::before,.motion-off *::after { animation:none!important; transition:none!important; }
+@media(min-width:1100px) { .note-group { transform:translateX(26px); } }
+@media(max-width:650px) {
+  .workspace-head { padding:20px 20px 8px; }
+  .scope .divider,.scope .note-count { display:none; }
+  .stage { min-height:calc(100svh - 115px); padding:20px 16px 24px; align-items:flex-start; }
+  .note-group { display:flex; flex-direction:column; gap:12px; }
+  .note-window { width:100%; border-radius:16px; }
+  .tool-rail { margin:0; flex-direction:row; align-self:center; padding:4px 6px; gap:6px; }
+  .rail-separator { width:1px; height:20px; margin:12px 4px; }
+  .rail-button .tip { top:auto; bottom:calc(100% + 10px); left:50%; translate:-50% 0; }
+  .note-body { padding:24px 22px 0; }
+  .composer { margin:0 14px; }
+  .note-footer { padding:16px 14px; }
+  .row-tool { opacity:1; }
+  h1 { font-size:26px; }
+  .bottom-status { padding-top:10px; }
+  .drawer { padding:20px; }
+  .keyboard-note { display:none; }
+}
+@media(max-width:370px) {
+  .stage { padding:16px 10px; }
+  .note-body { padding:20px 14px 0; }
+  .meta-row { gap:8px; font-size:11px; }
+  .compose-hint { display:none; }
+  .check-label { gap:10px; }
+  .primary { padding:0 12px; }
+}
+@media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important; transition:none!important; } }
+</style>
+</head>
+<body>
+<svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden"><defs>
+<symbol id="i-note" viewBox="0 0 24 24"><path d="M14 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10l6-6V5a2 2 0 0 0-2-2h-1M15 21v-6h6M8 8h4M8 12h3"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24"><path d="M8 3h8l-1 6 4 4v2H5v-2l4-4-1-6Zm4 12v6"/></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24"><path d="M6 12h12"/></symbol>
+<symbol id="i-settings" viewBox="0 0 24 24"><path d="m10 3-1 3-3 1-3 3 2 2-1 4 3 1 2 4 3-1 3 1 2-4 3-1-1-4 2-2-3-3-3-1-1-3Z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 19 19 5M5 5h14v14"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><path d="m21 3-7 18-4-7-7-4 18-7ZM10 14 21 3"/></symbol>
+<symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5"/><path d="m21 15-6-6L3 21"/></symbol>
+<symbol id="i-terminal" viewBox="0 0 24 24"><path d="m4 5 7 7-7 7m9 0h7"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+<symbol id="i-reply" viewBox="0 0 24 24"><path d="m9 5-6 6 6 6m-6-6h11a6 6 0 0 1 6 6v2"/></symbol>
+</defs></svg>
+<header class="workspace-head" data-od-id="workspace-header">
+  <div class="brand" data-od-id="product-name"><svg><use href="#i-note"/></svg><span>便签</span></div>
+  <div class="scope"><span>本机工作区</span><span class="divider"></span><span class="note-count">1 张便签</span></div>
+</header>
+<main class="stage" data-od-id="note-workspace">
+<div class="note-group">
+<div>
+<article class="note-window" data-od-id="acceptance-note">
+  <header class="window-head">
+    <span class="window-name"><svg><use href="#i-note"/></svg>本机验收</span>
+    <div class="window-actions">
+      <button class="icon-button pin" id="pin" aria-label="标记便签置顶" aria-pressed="false" data-od-id="pin-note"><svg><use href="#i-pin"/></svg><span class="tip">置顶标记</span></button>
+      <button class="icon-button" id="minimize" aria-label="收起便签" aria-expanded="true" data-od-id="collapse-note"><svg><use href="#i-minus"/></svg><span class="tip">收起便签</span></button>
+    </div>
+  </header>
+  <div class="paper" id="paper">
+    <div class="note-body">
+      <div class="meta-row"><span class="local-label"><svg><use href="#i-lock"/></svg>仅本地测试</span><span class="ai-status" id="ai-status"><span class="status-dot"></span><span id="status-copy">等待你的反馈</span></span></div>
+      <h1 data-od-id="note-title">三种插件验收</h1>
+      <p class="description">逐项确认，然后把结果留在这里。</p>
+      <div class="progress-row"><span class="progress-copy" id="progress-copy" aria-live="polite">0 / 3 项已验收</span><div class="progress-track" role="progressbar" aria-label="验收进度" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0" id="progress"><div class="progress-fill" id="progress-fill"></div></div></div>
+      <ul class="checklist" id="checklist" data-od-id="acceptance-checklist"></ul>
+      <div class="task-link-row"><button class="text-button" id="details" data-od-id="task-details">任务详情<svg><use href="#i-chevron"/></svg></button></div>
+    </div>
+    <div class="composer" id="composer" data-od-id="reply-composer">
+      <div class="composer-label"><label for="reply">回复</label><span class="draft-state" id="draft-state">草稿自动保存</span></div>
+      <textarea id="reply" placeholder="写下验收结果，也可以直接粘贴图片…" data-od-id="reply-input"></textarea>
+      <div class="attachment-list" id="attachments"></div>
+      <div class="compose-tools"><button class="text-button" id="attach" data-od-id="add-image"><svg><use href="#i-image"/></svg>添加图片</button><span class="compose-hint">文字和图片，都可以</span></div>
+      <input type="file" id="file-input" accept="image/*" multiple hidden>
+    </div>
+    <footer class="note-footer"><button class="text-button complete-only" id="complete-only" data-od-id="complete-without-reply">仅完成</button><button class="primary" id="submit" data-od-id="complete-and-reply"><span id="submit-label">完成并回复</span><svg class="send-icon"><use href="#i-send"/></svg></button></footer>
+  </div>
+  <div class="paper mini-window" id="mini" hidden><div><strong>三种插件验收</strong><p class="mini-meta" id="mini-progress">0 / 3 项已验收</p></div><button class="icon-button" id="restore" aria-label="展开便签" data-od-id="expand-note"><svg><use href="#i-note"/></svg></button></div>
+  <section class="drawer" id="drawer" hidden aria-label="便签侧面板" data-od-id="note-drawer"><div class="drawer-head"><h2 id="drawer-title"></h2><button class="icon-button" id="close-drawer" aria-label="关闭面板" data-od-id="close-panel"><svg><use href="#i-close"/></svg></button></div><div id="drawer-content"></div></section>
+</article>
+<div class="bottom-status"><span class="saved-label" id="saved-label"><svg><use href="#i-check"/></svg><span id="save-copy">已保存在此设备</span></span><span id="pin-state">未置顶</span></div>
+</div>
+<nav class="tool-rail" aria-label="便签工具" data-od-id="note-tools">
+  <button class="icon-button rail-button" id="show-note" aria-label="便签内容" aria-current="page" data-od-id="view-note"><svg><use href="#i-note"/></svg><span class="tip">便签内容</span></button>
+  <button class="icon-button rail-button" id="show-tools" aria-label="插件工具" data-od-id="view-tools"><svg><use href="#i-terminal"/></svg><span class="tip">插件工具</span></button>
+  <button class="icon-button rail-button" id="show-history" aria-label="回复记录" data-od-id="view-history"><svg><use href="#i-clock"/></svg><span class="tip">回复记录</span></button>
+  <span class="rail-separator"></span>
+  <button class="icon-button rail-button" id="show-settings" aria-label="便签设置" data-od-id="view-settings"><svg><use href="#i-settings"/></svg><span class="tip">便签设置</span></button>
+</nav>
+</div>
+</main>
+<p class="keyboard-note"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> 完成并回复<span aria-hidden="true">　·　</span><kbd>Esc</kbd> 返回便签</p>
+<div class="toast" id="toast" role="status" hidden></div>
+<dialog id="complete-dialog" data-od-id="completion-dialog"><h2>还有项目未验收</h2><p id="complete-message"></p><div class="dialog-actions"><button class="outline-button" id="cancel-complete" data-od-id="continue-checking">继续验收</button><button class="outline-button" id="confirm-complete" data-od-id="confirm-completion">仍然完成</button></div></dialog>
+<dialog id="config-dialog" data-od-id="tool-configuration"><h2>工具设置</h2><p>仅保存配置草稿，执行需要连接本机插件服务。</p><label class="field">工具名称<input id="tool-name" maxlength="60" required></label><label class="field">执行内容<input id="tool-command" placeholder="输入命令或操作说明" maxlength="500"></label><div class="dialog-actions"><button class="outline-button" id="cancel-config" data-od-id="cancel-tool-config">取消</button><button class="outline-button" id="save-config" data-od-id="save-tool-config">保存配置</button></div></dialog>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const STORAGE = 'od-sticky-note-v1';
+const tasks = [
+  { id:'web', name:'网页插件', instruction:'右键修改并保存，再左键执行' },
+  { id:'simple', name:'简单插件', instruction:'展开工具设置，保存后左键执行' },
+  { id:'plain', name:'无配置插件', instruction:'左键执行，右键查看计数结果' }
+];
+const initial = { checks:[false,false,false],reply:'',attachments:[],pinned:false,motion:true,collapsed:false,completed:false,history:[],configs:{} };
+let state = {...initial}, toastTimer, draftTimer, pendingReply = true, configId, activePanel = null, previousFocus;
+let storageAvailable = true;
+try {
+  const saved = JSON.parse(localStorage.getItem(STORAGE) || 'null');
+  if(saved && typeof saved === 'object') {
+    state.checks = tasks.map((_,i) => !!saved.checks?.[i]);
+    for(const key of ['reply']) if(typeof saved[key] === 'string') state[key] = saved[key];
+    for(const key of ['pinned','motion','collapsed','completed']) if(typeof saved[key] === 'boolean') state[key] = saved[key];
+    if(Array.isArray(saved.history)) state.history = saved.history.filter(x => x && typeof x.text === 'string' && typeof x.time === 'string' && Number.isFinite(Date.parse(x.time))).slice(0,30).map(x=>({...x,images:Array.isArray(x.images)?x.images.filter(a=>a && typeof a.name==='string' && typeof a.src==='string'):[]}));
+    if(saved.configs && typeof saved.configs === 'object') state.configs = saved.configs;
+    if(Array.isArray(saved.attachments)) state.attachments = saved.attachments.filter(a => a && typeof a.src === 'string' && /^data:image\/(png|jpeg|gif|webp);base64,/.test(a.src) && typeof a.name === 'string');
+  }
+} catch { storageAvailable = false; }
+const escapeHtml = text => String(text).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const icon = name => `<svg aria-hidden="true"><use href="#i-${name}"/></svg>`;
+const checkedCount = () => state.checks.filter(Boolean).length;
+function toast(message) {
+  clearTimeout(toastTimer); $('toast').textContent = message; $('toast').hidden = false;
+  toastTimer = setTimeout(() => {$('toast').hidden = true;},3600);
+}
+function save() {
+  try { localStorage.setItem(STORAGE,JSON.stringify(state)); storageAvailable = true; }
+  catch { storageAvailable = false; }
+  $('save-copy').textContent = storageAvailable ? '已保存在此设备' : '存储不可用，本次更改仅暂存';
+  return storageAvailable;
+}
+function renderProgress() {
+  const count = checkedCount(), text = `${count} / ${tasks.length} 项已验收`;
+  $('progress-copy').textContent = text; $('mini-progress').textContent = text;
+  $('progress-fill').style.width = `${count / tasks.length * 100}%`;
+  $('progress').setAttribute('aria-valuenow',count);
+  $('status-copy').textContent = state.completed ? '任务已完成' : '等待你的反馈';
+  $('submit-label').textContent = state.completed ? '补充回复' : '完成并回复';
+  $('complete-only').textContent = state.completed ? '重新打开任务' : '仅完成';
+}
+function renderChecks() {
+  $('checklist').innerHTML = tasks.map((task,i) => `<li class="check-row ${state.checks[i] ? 'done' : ''}" data-od-id="check-${task.id}"><label class="check-label"><span class="check-box"><input type="checkbox" data-index="${i}" ${state.checks[i] ? 'checked' : ''} aria-label="${task.name}已验收"><span class="check-visual">${icon('check')}</span></span><span class="check-copy"><span class="check-title">${task.name}</span><span class="check-detail">${task.instruction}</span></span></label><button class="icon-button row-tool" data-tool="${task.id}" aria-label="查看${task.name}工具" data-od-id="open-${task.id}-tool">${icon('arrow')}</button></li>`).join('');
+  renderProgress();
+}
+function renderPin() {
+  $('pin').setAttribute('aria-pressed',state.pinned);
+  $('pin-state').textContent = state.pinned ? '已标记置顶' : '未置顶';
+}
+function setCollapsed(value) {
+  state.collapsed = value; $('paper').hidden = value; $('mini').hidden = !value;
+  $('minimize').setAttribute('aria-expanded',!value); $('minimize').setAttribute('aria-label',value ? '展开便签' : '收起便签');
+  $('minimize').querySelector('.tip').textContent = value ? '展开便签' : '收起便签';
+}
+function renderAttachments() {
+  $('attachments').innerHTML = state.attachments.map((a,i) => `<div class="attachment" data-od-id="attachment-${i}"><img src="${a.src}" alt="${escapeHtml(a.name)}的完整预览"><span>${escapeHtml(a.name)}</span><button class="icon-button" data-remove="${i}" aria-label="移除${escapeHtml(a.name)}" data-od-id="remove-attachment-${i}">${icon('close')}</button></div>`).join('');
+}
+function closeDrawer(restoreFocus=true) {
+  $('drawer').hidden = true; activePanel = null;
+  document.querySelectorAll('.rail-button').forEach(b => b.removeAttribute('aria-current'));
+  $('show-note').setAttribute('aria-current','page');
+  if(restoreFocus && previousFocus?.isConnected) previousFocus.focus();
+}
+function openPanel(type) {
+  if(activePanel === type) {closeDrawer();return;}
+  previousFocus = document.activeElement;
+  setCollapsed(false); activePanel = type;
+  const titles = {tools:'插件工具',history:'回复记录',settings:'便签设置',details:'任务详情'};
+  $('drawer-title').textContent = titles[type]; $('drawer').hidden = false;
+  document.querySelectorAll('.rail-button').forEach(b => b.removeAttribute('aria-current'));
+  $(`show-${type === 'details' ? 'note' : type}`)?.setAttribute('aria-current','page');
+  renderPanel(); $('close-drawer').focus();
+}
+function renderPanel() {
+  const content = $('drawer-content');
+  if(activePanel === 'tools') {
+    content.innerHTML = `<p class="drawer-sub">配置、执行和查看结果，集中在这里。</p><p class="tool-output">尚未连接插件服务。可以编辑本地配置，执行结果将在连接后显示。</p>` + tasks.map(t => `<section class="tool-card" data-od-id="tool-card-${t.id}"><h3>${t.name}</h3><p>${t.instruction}</p><div class="actions"><button class="text-button" data-config="${t.id}" data-od-id="configure-${t.id}">${icon('settings')}工具设置</button><button class="outline-button" data-run="${t.id}" data-od-id="execute-${t.id}">执行工具</button></div><div class="tool-output" data-output="${t.id}" hidden></div></section>`).join('');
+  } else if(activePanel === 'history') {
+    content.innerHTML = '<p class="drawer-sub">保存在此设备的完成记录与补充回复。</p>' + (state.history.length ? state.history.map((entry,i) => `<article class="history-entry" data-od-id="reply-record-${i}"><time>${escapeHtml(new Date(entry.time).toLocaleString('zh-CN',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'}))}</time><p>${escapeHtml(entry.text)}</p>${entry.images?.filter(a=>/^data:image\/(png|jpeg|gif|webp);base64,/.test(a.src)).map(a=>`<img src="${a.src}" alt="${escapeHtml(a.name)}" style="max-width:100%;height:auto;max-height:200px;object-fit:contain;margin-top:12px">`).join('') || ''}</article>`).join('') : '<p class="empty">还没有回复。完成验收后，留下第一条记录。</p>');
+  } else if(activePanel === 'settings') {
+    content.innerHTML = `<p class="drawer-sub">让便签按你的习惯工作。</p><div class="settings-row"><div><strong>控件动效</strong><p>勾选反馈、面板展开与按钮响应</p></div><button class="switch" role="switch" aria-checked="${state.motion}" aria-label="控件动效" id="motion-toggle" data-od-id="toggle-motion"></button></div><div class="settings-row"><div><strong>置顶标记</strong><p>记住这张便签的重要性</p></div><button class="switch" role="switch" aria-checked="${state.pinned}" aria-label="置顶标记" id="pin-toggle" data-od-id="toggle-pin"></button></div><div class="settings-row"><div><strong>本地存储</strong><p>${storageAvailable ? '草稿、清单与记录自动保存在此浏览器' : '存储不可用，本次更改只在当前页面保留'}</p></div>${icon('lock')}</div>`;
+  } else if(activePanel === 'details') {
+    content.innerHTML = `<p class="drawer-sub">本机验收 · 仅本地测试</p><dl class="details-list"><dt>任务</dt><dd>三种插件验收</dd><dt>当前进度</dt><dd>${checkedCount()} / 3 项已验收</dd><dt>状态</dt><dd>${state.completed ? '已完成' : '等待反馈'}</dd><dt>验收范围</dt><dd>网页插件、简单插件、无配置插件</dd><dt>完成方式</dt><dd>勾选验收项后，可仅完成，或填写回复一并完成。</dd></dl>`;
+  }
+}
+function configure(id) {
+  configId = id; const task = tasks.find(t=>t.id===id), config = state.configs[id];
+  $('tool-name').value = typeof config?.name === 'string' ? config.name : task.name;
+  $('tool-command').value = typeof config?.command === 'string' ? config.command : '';
+  $('config-dialog').showModal();
+}
+function complete(withReply) {
+  const reply = $('reply').value.trim();
+  if(withReply && !reply && !state.attachments.length) {toast('先写点验收结果，或添加一张图片。');$('reply').focus();return;}
+  pendingReply = withReply;
+  if(checkedCount() < tasks.length && !state.completed) {
+    $('complete-message').textContent = `已验收 ${checkedCount()} 项，还有 ${tasks.length-checkedCount()} 项未勾选。确定结束这次验收吗？`;
+    $('complete-dialog').showModal(); return;
+  }
+  commitCompletion();
+}
+function commitCompletion() {
+  state.history.unshift({time:new Date().toISOString(),text:pendingReply ? $('reply').value.trim() || '已附图片反馈' : '任务已完成，未附回复。',images:pendingReply ? state.attachments.map(a=>({...a})) : []});
+  state.history = state.history.slice(0,30); state.completed = true;
+  if(pendingReply) {state.reply = ''; state.attachments = []; $('reply').value = '';renderAttachments();}
+  const persisted = save(); renderProgress();
+  toast(persisted ? (pendingReply ? '已完成，回复已保存到本地记录。' : '已完成，验收记录已保存。') : '已在当前页面完成，存储空间不足，记录尚未持久保存。');
+}
+async function addImages(files) {
+  const supported = new Set(['image/png','image/jpeg','image/gif','image/webp']);
+  for(const file of files) {
+    if(!supported.has(file.type)) {toast('请选择 PNG、JPEG、GIF 或 WebP 图片。');continue;}
+    if(file.size > 1500000) {toast('单张图片请小于 1.5 MB。');continue;}
+    if(state.attachments.length >= 4) {toast('每条回复最多添加 4 张图片。');break;}
+    try {
+      const src = await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);});
+      state.attachments.push({name:file.name || '粘贴的图片',src});
+    } catch {toast('图片读取失败，请重新选择。');}
+  }
+  renderAttachments(); if(!save()) toast('图片已添加，但存储空间不足，本次内容仅暂存。');
+}
+$('checklist').addEventListener('change',event=>{
+  const i=Number(event.target.dataset.index); if(!Number.isInteger(i)||i<0||i>=tasks.length)return;
+  state.checks[i] = event.target.checked; state.completed = false;
+  event.target.closest('.check-row').classList.toggle('done',state.checks[i]); renderProgress();save();
+});
+$('checklist').addEventListener('click',event=>{if(event.target.closest('[data-tool]'))openPanel('tools');});
+$('pin').addEventListener('click',()=>{state.pinned=!state.pinned;renderPin();save();toast(state.pinned ? '已标记置顶。此标记在本地保留。' : '已取消置顶标记。');});
+$('minimize').addEventListener('click',()=>{closeDrawer(false);setCollapsed(!state.collapsed);save();});
+$('restore').addEventListener('click',()=>{setCollapsed(false);save();$('minimize').focus();});
+$('reply').addEventListener('input',()=>{
+  state.reply=$('reply').value; $('draft-state').textContent='正在保存…'; clearTimeout(draftTimer);
+  draftTimer=setTimeout(()=>{$('draft-state').textContent=save()?'草稿已保存':'草稿仅暂存';},400);
+});
+$('attach').addEventListener('click',()=>$('file-input').click());
+$('file-input').addEventListener('change',async event=>{await addImages([...event.target.files]);event.target.value='';});
+$('reply').addEventListener('paste',event=>{
+  const images=[...(event.clipboardData?.items || [])].filter(x=>x.kind==='file'&&x.type.startsWith('image/')).map(x=>x.getAsFile()).filter(Boolean);
+  if(images.length){event.preventDefault();addImages(images);}
+});
+$('attachments').addEventListener('click',event=>{const button=event.target.closest('[data-remove]');if(button){state.attachments.splice(Number(button.dataset.remove),1);renderAttachments();save();$('attach').focus();}});
+$('submit').addEventListener('click',()=>complete(true));
+$('complete-only').addEventListener('click',()=>{
+  if(state.completed){state.completed=false;renderProgress();save();toast('任务已重新打开。');}
+  else complete(false);
+});
+$('cancel-complete').addEventListener('click',()=>$('complete-dialog').close());
+$('confirm-complete').addEventListener('click',()=>{$('complete-dialog').close();commitCompletion();});
+$('details').addEventListener('click',()=>openPanel('details'));
+for(const type of ['tools','history','settings']) $(`show-${type}`).addEventListener('click',()=>openPanel(type));
+$('show-note').addEventListener('click',()=>{closeDrawer(false);setCollapsed(false);save();});
+$('close-drawer').addEventListener('click',()=>closeDrawer());
+$('drawer-content').addEventListener('click',event=>{
+  const config = event.target.closest('[data-config]'), run = event.target.closest('[data-run]');
+  if(config)configure(config.dataset.config);
+  if(run){
+    const output=$('drawer-content').querySelector(`[data-output="${run.dataset.run}"]`);
+    output.hidden=false;output.textContent='无法执行：尚未连接本机插件服务。配置草稿已保留。';
+  }
+  if(event.target.closest('#motion-toggle')) {state.motion=!state.motion;document.documentElement.classList.toggle('motion-off',!state.motion);save();renderPanel();$('motion-toggle').focus();}
+  if(event.target.closest('#pin-toggle')) {state.pinned=!state.pinned;renderPin();save();renderPanel();$('pin-toggle').focus();}
+});
+$('save-config').addEventListener('click',()=>{
+  if(!$('tool-name').reportValidity())return;
+  state.configs[configId]={name:$('tool-name').value.trim(),command:$('tool-command').value.trim()};
+  const ok=save();$('config-dialog').close();toast(ok?'工具配置已保存在本地。':'配置仅暂存，当前存储不可用。');
+});
+$('cancel-config').addEventListener('click',()=>$('config-dialog').close());
+document.addEventListener('keydown',event=>{
+  const modalOpen = $('complete-dialog').open || $('config-dialog').open;
+  if((event.ctrlKey||event.metaKey)&&event.key==='Enter'&&!modalOpen&&!activePanel){event.preventDefault();if(state.collapsed)setCollapsed(false);complete(true);}
+  if(event.key==='Escape'&&activePanel&&!modalOpen){closeDrawer();}
+});
+document.documentElement.classList.toggle('motion-off',!state.motion);
+$('reply').value=state.reply;renderChecks();renderPin();renderAttachments();setCollapsed(state.collapsed);
+$('save-copy').textContent=storageAvailable?'已保存在此设备':'存储不可用，本次更改仅暂存';
+})();
+</script>
+</body>
+</html>

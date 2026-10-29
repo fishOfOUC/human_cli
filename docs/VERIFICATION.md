@@ -24,7 +24,7 @@
 
 ## 构建
 
-`npm run build`：通过。字体等资源本地打包，不依赖 Google Fonts 网络服务。前端样式检查 0 FAIL / 0 WARN；`git diff --check` 无空白错误。
+`npm run build`：通过。界面使用系统字体及本地资源，不依赖外部字体或 CDN 服务。前端样式检查 0 FAIL / 0 WARN；`git diff --check` 无空白错误。
 
 ## 原生验收
 
@@ -61,3 +61,15 @@ Windows x64 便携包使用真实 MCP 客户端调用包内适配器，自动启
 本地预览 EXE 回归通过 20 项，报告为 `.qa/cli-中文 空格-mAmTW6/acceptance.json`；release/config-ui-preview.json 记录预览目录，release/latest.json 继续指向原正式本地副本。测试提供者目录已确认不在预览包内。
 
 生命周期规则见 [LIFECYCLE.md](LIFECYCLE.md)。当前变更仅在本地预览，未上传或发布。
+
+## 新界面迁移（本地）
+
+迁移来源为用户提供的 prototype/rebuild/sticky-note.html，按用户选择保留原来的小便签尺寸。实现与验证入口见 [UI-REBUILD.md](UI-REBUILD.md)。测试与截图均使用独立 .qa 数据目录，原稿及测试服务不随产品打包。
+
+本次验证结果：68 项核心测试；25 项原生流程（`.qa/native-1ce873e3/report.json`）；25 项网页配置（`.qa/config-ui-3bee2f36/report.json`）；12 项生命周期（`.qa/lifecycle-7a6fb298/report.json`）；16 项迁移界面检查（`.qa/rebuild-c801a9b3/report.json`）；20 项打包 CLI/MCP（`.qa/cli-中文 空格-4OH0we/acceptance.json`）。四主题及扩大尺寸截图已检查，默认小尺寸与最小尺寸控制区均通过测量。
+
+界面验收反馈修正：70 项核心测试通过；28 项迁移界面验证通过（`.qa/rebuild-52547165/report.json`），其中四边四角使用 Electron 向受测窗口发送鼠标事件，经真实 preload/IPC 更新原生 bounds。DIP 指针坐标只在测试进程中注入，不移动系统鼠标。另验证空回复直接完成与仅图片回复保留附件。网页配置 25 项（`.qa/config-ui-9f37b081/report.json`）、生命周期 12 项（`.qa/lifecycle-eaef8049/report.json`）通过。
+
+修正版本的本地 EXE 验证通过 20 项（`.qa/cli-中文 空格-xEFbVL/acceptance.json`）。显示器变化会中断旧缩放会话；此项使用测试进程中的屏幕度量事件验证，未声称实际拔插硬件。
+
+项目整理后再次通过 70 项核心测试及 20 项打包 CLI/MCP 检查（`.qa/cli-中文 空格-hl2lOQ/acceptance.json`）。新包确认不包含原型、测试、打包源码、根目录开发启动脚本或已移除的字体依赖；所需的 Windows 截图桥仍在 desktop 目录内。原始重构稿按 SHA256 原样归档到 prototype/rebuild。

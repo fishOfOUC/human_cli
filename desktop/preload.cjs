@@ -9,6 +9,6 @@ contextBridge.exposeInMainWorld('humanCli', {
   attachImage: (id) => invoke('attachImage', { id }), attachError: (id) => invoke('attachError', { id }), removeError: (id) => invoke('removeError', { id }),
   saveResult: (id) => invoke('saveResult', { id }), copyText: (text) => invoke('copyText', { text }),
   preferences: (data) => invoke('preferences', data), hide: () => invoke('hide'),
-  resize: (data) => invoke('resize', data),
+  beginResize: (edge) => invoke('beginResize', { edge }), resize: () => invoke('resize'), endResize: () => invoke('endResize'),
   onState: (callback) => { const listener = (_event, value) => callback(value); ipcRenderer.on('human-cli:state', listener); return () => ipcRenderer.removeListener('human-cli:state', listener); },
 });
