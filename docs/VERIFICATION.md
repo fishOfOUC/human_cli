@@ -64,7 +64,7 @@ Windows x64 便携包使用真实 MCP 客户端调用包内适配器，自动启
 
 ## 新界面迁移（本地）
 
-迁移来源为用户提供的 prototype/rebuild/sticky-note.html，按用户选择保留原来的小便签尺寸。实现与验证入口见 [UI-REBUILD.md](UI-REBUILD.md)。测试与截图均使用独立 .qa 数据目录，原稿及测试服务不随产品打包。
+迁移来源为用户提供的 archive/prototype/rebuild/sticky-note.html，按用户选择保留原来的小便签尺寸。实现与验证入口见 [UI-REBUILD.md](UI-REBUILD.md)。测试与截图均使用独立 .qa 数据目录，原稿及测试服务不随产品打包。
 
 本次验证结果：68 项核心测试；25 项原生流程（`.qa/native-1ce873e3/report.json`）；25 项网页配置（`.qa/config-ui-3bee2f36/report.json`）；12 项生命周期（`.qa/lifecycle-7a6fb298/report.json`）；16 项迁移界面检查（`.qa/rebuild-c801a9b3/report.json`）；20 项打包 CLI/MCP（`.qa/cli-中文 空格-4OH0we/acceptance.json`）。四主题及扩大尺寸截图已检查，默认小尺寸与最小尺寸控制区均通过测量。
 
@@ -72,4 +72,56 @@ Windows x64 便携包使用真实 MCP 客户端调用包内适配器，自动启
 
 修正版本的本地 EXE 验证通过 20 项（`.qa/cli-中文 空格-xEFbVL/acceptance.json`）。显示器变化会中断旧缩放会话；此项使用测试进程中的屏幕度量事件验证，未声称实际拔插硬件。
 
-项目整理后再次通过 70 项核心测试及 20 项打包 CLI/MCP 检查（`.qa/cli-中文 空格-hl2lOQ/acceptance.json`）。新包确认不包含原型、测试、打包源码、根目录开发启动脚本或已移除的字体依赖；所需的 Windows 截图桥仍在 desktop 目录内。原始重构稿按 SHA256 原样归档到 prototype/rebuild。
+项目整理后再次通过 70 项核心测试及 20 项打包 CLI/MCP 检查（`.qa/cli-中文 空格-hl2lOQ/acceptance.json`）。新包确认不包含原型、测试、打包源码、根目录开发启动脚本或已移除的字体依赖；所需的 Windows 截图桥仍在 desktop 目录内。原始重构稿按 SHA256 原样归档，现位于 archive/prototype/rebuild。
+
+回复区精简：30 项界面检查通过（`.qa/rebuild-ba4c62f9/report.json`），确认无上传按钮、保存标签或 textarea 原生缩放手柄，回复框覆盖输入容器的九成以上，顶部标题栏与任务标题标记为原生拖动区。25 项原生检查通过（`.qa/native-96008858/report.json`），覆盖回复框拖入图片、粘贴图片、整张便签拖入图片，以及 MCP 图片回传。
+
+后续验收纠正：回复框恢复约 64px 默认高度及占位提示，增加整条上下边缘的高度调整区域。32 项界面检查通过（`.qa/rebuild-0e75fda5/report.json`），使用受测 WebContents 的鼠标事件分别验证上下边调整回复框高度，窗口大小保持不变；窗口顶部标题栏负责移动，输入框无右下角原生手柄。
+
+回复框下边联动修正已通过 33 项界面检查，报告见最新 .qa/rebuild-*/report.json。专门核对回复框上边坐标固定、下边坐标和窗口高度等量改变，以及向上回拖时一起缩短。
+
+## v2 有序回复与路径附件（2026-10-29）
+
+默认回复改为 schemaVersion=1、有序 content[]，图片与普通文件只交付缓存绝对路径。回复缓存默认在软件目录/cache，状态及原始附件仍使用原数据目录；测试通过 HUMAN_CLI_CACHE_DIR 隔离缓存，不触碰日常数据。
+
+- 81 项核心/适配器/编辑模型测试通过，日志 `.qa/response-tests-final.log`。新增文字/图片/文件/诊断穿插、异步上传乱序、失败重试与阻止提交、空文件和同名文件、附件归属、完成失败回滚、旧记录迁移、软件目录移动后路径重建、CLI/MCP 一致性及显式 legacy 兼容。
+- 10 项真实有序回复验收：`.qa/ordered-reply-2674107c/report.json`。通过受测 Electron WebContents 向真实编辑器派发粘贴/拖放/按钮事件，经 preload/IPC 和真实存储，验证“文 → 图 → 文 → 文件 → 文”、上移下移、损坏图片阻止完成、CLI/MCP JSON 完全一致及路径原始字节可读。浅色和深色截图已检查；不操作系统鼠标或键盘。
+- 25 项原生流程：`.qa/native-89f5d8eb/report.json`；12 项生命周期：`.qa/lifecycle-d84acf2d/report.json`；33 项便签迁移/缩放/四主题：`.qa/rebuild-431448f5/report.json`；25 项插件网页配置：`.qa/config-ui-c0562297/report.json`，均通过。
+- 发布包 EXE/MCP 通过 21 项检查：`.qa/cli-中文 空格-Vd4jD2/acceptance.json`。受测子进程 PATH 为空，验证不依赖系统 Node、中文及空格路径、UTF-8 标准输入、同次等待、取消、按需启动/退出、MCP 以及默认缓存确实位于发布软件目录。打包排除源码根缓存与测试目录，便携 ZIP 也排除根目录验收缓存。
+- 延用现有便签样式与主题令牌，新增有序编辑区的源样式检查通过（0 FAIL、0 WARN）。实际原生窗口截图与最小尺寸检查作为桌面 UI 验收依据。
+
+软件目录搬迁、旧记录和存储故障恢复通过隔离目录/注入故障验证；不宣称实际拔插硬件或真实磁盘耗尽。输入框偶发丢字仍为独立已知问题，本次未单独排查或声称修复。
+
+## v2.0.1 MCP strict 声明兼容（2026-10-29）
+
+- 88 项自动化测试通过：`.qa/strict-schema-tests-final.log`。新增闭合/required/nullable 声明、原有省略参数、默认值、任意插件 JSON 配置与旧对象兼容、配置内部 null 保留、无效 JSON、UUID/范围/长度校验，以及局部更新不清空未提供字段。
+- 真实 MCP 调用验证 strict 风格完整 null 参数与旧式最少参数都可用，包含创建、查询日志、更新及取消；无效配置不会创建便签。服务端没有删除原有业务校验。
+- 本机 CodeBuddy Code 2.178.1 的真实转换器复测：`.qa/codebuddy-schema-after.json`。只从已安装 dist/codebuddy.js 提取转换模块，在隔离 VM 中执行其开放对象检查和 strict 准备逻辑，不启动模型、不加载账号、不修改客户端。原工具列表在本机测得 3 项转换失败；修复后 3 次连接 × 每次 2 次 tools/list × 8 个工具，48 次转换全部成功。报告记录了客户端版本与 bundle SHA256。
+- 10 项真实窗口与有序路径回复验收通过：`.qa/ordered-reply-c6ebe423/report.json`，确认文字/图片/文件顺序、保存失败保护、缓存字节、CLI/MCP 返回一致及无渲染错误。
+- 发布包通过 22 项 EXE/MCP 检查：`.qa/cli-中文 空格-nIT4ye/acceptance.json`，包括空 PATH、中文/空格、同次等待、按需退出及发布版 strict 声明。包内 MCP 入口再次通过 48 次 CodeBuddy 转换，报告 `.qa/codebuddy-schema-packaged.json`。35 个运行模块与当前源码逐字节一致；便携 ZIP 排除根目录验收缓存。
+
+可重复执行：`node tests/codebuddy-schema-smoke.mjs <已安装的dist/codebuddy.js> [修改前工具列表.json] [报告.json]`。转换模块提取以本机受测版本为准；客户端内部布局改变时测试会明确失败，不能静默跳过。更换软件后应重启旧桌面端并重连 MCP，使代码与工具声明刷新。
+
+## v2.0.2 空内容确认与 MCP 空串占位（2026-10-29）
+
+- 91 项自动化测试通过，日志 `.qa/confirmation-tests-final.log`。覆盖空文本/空白/only 完成标记、缓存及重启保留标记、human_get 可见性，有文字/图片/空文件时不误判为空，以及 pending/cancelled/discarded 不误标确认。
+- 实际 MCP 调用传入 agent=""、idempotencyKey=""、format="" 后成功创建并在同次调用收到空提交说明。两次空幂等键调用生成不同请求与真实幂等键，不使用共享占位常量。必填标题、插件标识、有效幂等键以及插件内部空串保持原规则。
+- 12 项真实窗口检查通过：`.qa/ordered-reply-ab14c0bd/report.json`。新增不输入内容直接点击完成，确认 AI 实际收到 confirmation_only，完整查询与持久完成结果也包含同一说明；有序图片/文件交付继续通过。
+- 本机 CodeBuddy 转换器 48 次声明转换全部通过，报告 `.qa/confirmation-codebuddy-schema.json`；本次不将空提交归因为输入丢失，也未修改独立的已知丢字问题。
+- 发布包 22 项 EXE/MCP 检查通过：`.qa/cli-中文 空格-XgO6Ao/acceptance.json`；包内声明另经 48 次 CodeBuddy 转换，报告 `.qa/confirmation-codebuddy-packaged.json`。35 个运行模块与源码逐字节一致，文档 JSON 示例解析通过。已确认打包排除本地 .mcp.json，便携 ZIP 同时排除根目录验收缓存。
+
+## v2.0.3 用户关闭控件（2026-10-29）
+
+- 93 项自动化测试通过，日志 `.qa/user-close-tests-final.log`。新增用户关闭只取消目标、明确 cancelledBy=user、取消响应不携带草稿（含 legacy）、重复关闭与已完成竞争不误改状态、保存失败可重试及重启持久状态验证。
+- 17 项真实窗口检查：`.qa/ordered-reply-33176802/report.json`，包含紧凑标题栏独立关闭/最小化控件、点击关闭向等待 AI 返回取消、保存草稿不作为回复交付、伴随请求继续等待、原生 close 事件与按钮同一路径，以及等待附件读取时仍可关闭。默认尺寸、浅色和深色截图已检查；不发送系统全局鼠标或按键。
+- 12 项实际进程生命周期：`.qa/lifecycle-37244fb1/report.json`，验证最后一项由用户关闭后真实进程退出，重启无取消任务窗口复活，缓存查询可继续恢复历史。
+- 25 项插件配置页检查：`.qa/config-ui-f3557017/report.json`，包括通过新关闭按钮取消任务并释放配置页会话。界面源码风格检查为 0 FAIL、0 WARN。
+- 33 项便签界面回归：`.qa/rebuild-9d6264b9/report.json`，覆盖四主题、最小尺寸、窗口与回复框边缘缩放及完成流程。
+- v2.0.3 便携包 EXE/MCP 通过 22 项检查：`.qa/cli-中文 空格-qjIm3V/acceptance.json`。35 个运行模块及 4 个前端产物与工作区逐字节一致，包内排除本地 MCP 配置及测试目录，便携 ZIP 排除根目录验收缓存。
+
+## 目录整理与提交前回归（2026-10-30）
+
+- `npm test` 93 项通过，`npm run build` 通过；日志分别为 `.qa/github-submit-tests.log`、`.qa/github-submit-build.log`。静态图标从 `public/` 正常复制到构建目录。
+- 有序回复与关闭控件原生检查 17 项通过：`.qa/ordered-reply-ffba269a/report.json`；实际进程生命周期检查 12 项通过：`.qa/lifecycle-6d725dd0/report.json`。
+- `skills/human-cli/` 格式检查通过，12 段 JSON 示例可解析，MCP/CLI 请求示例通过实际契约校验。启动提供者经真实 HTTP SPI、NetworkPluginHost 与 RequestService 验证 7 项通过：`.qa/skill-launch-cf2555af/report.json`。使用隔离目录及后台测试子程序，未声称验证交互窗口的视觉表现。
+- 11 个历史原型文件迁移至 `archive/prototype/` 后，与 Git 原版本对象逐字节一致；`public/favicon.svg` 同样一致。迁移后的 PowerShell 启动脚本语法检查通过，未执行会打开日常应用的启动脚本。

@@ -1,4 +1,4 @@
-/* Visual language from prototype/rebuild/sticky-note.html, compact native sizing. */
+/* Visual language from archive/prototype/rebuild/sticky-note.html, compact native sizing. */
 :root {
   --bg:oklch(99% .002 240); --surface:oklch(100% 0 0); --fg:oklch(18% .012 250);
   --muted:oklch(54% .012 250); --border:oklch(92% .005 250); --accent:oklch(58% .18 255);
@@ -46,7 +46,7 @@ svg { width:15px; height:15px; flex-shrink:0; stroke-width:1.6; }
 .form-label { display:block; font-size:11px; margin:10px 0 5px; }
 .form-input,.copy-fallback { width:100%; color:var(--fg); background:var(--bg); border:1px solid var(--control); border-radius:7px; }
 .form-input { min-height:30px; padding:4px 8px; font-size:11px; }.form-input:focus { outline:1px solid var(--accent-ink); outline-offset:1px; }
-.config-textarea { height:72px; resize:vertical; }
+.config-textarea { height:72px; resize:none; }
 .tool-hint { color:var(--muted); font-size:11px; line-height:1.7; margin:10px 0 0; overflow-wrap:anywhere; }
 .motion-off *,.motion-off *::before,.motion-off *::after { animation:none!important; transition:none!important; }
 @media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important; transition:none!important; } }

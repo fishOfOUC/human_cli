@@ -18,14 +18,16 @@ export function registerIpc(service, windows, configUis) {
       switch (action) {
         case 'bootstrap': return { ok: true, value: state(win) };
         case 'hide': void configUis?.close(win); win.minimize(); break;
+        case 'close': needRequest(); service.closeByUser(id); break;
         case 'preferences': service.preferences(data); break;
-        case 'beginResize': windows.beginResize(win, data.edge); break;
-        case 'resize': windows.resize(win); break;
+        case 'beginResize': return { ok: true, value: windows.beginResize(win, data.edge, data.replyHeight) };
+        case 'resize': return { ok: true, value: windows.resize(win) };
         case 'endResize': windows.endResize(win); break;
         case 'copyText': fail(typeof data.text === 'string' && data.text.length <= 100000, 'E_CLIPBOARD', '复制内容无效。'); clipboard.writeText(data.text); break;
         case 'draft': needRequest(); service.draft(id, data); break;
         case 'complete': needRequest(); service.complete(id, data); break;
         case 'addImage': needRequest(); service.addImage(id, { name: data.name, mime: data.mime, bytes: data.bytes }); break;
+        case 'uploadAttachment': needRequest(); return { ok: true, value: service.addAttachment(id, { name: data.name, mime: data.mime, bytes: data.bytes }, { insert: false }) };
         case 'removeImage': needRequest(); service.removeAttachment(id, data.id); break;
         case 'attachImage': needRequest(); service.attach(id, data.id); break;
         case 'attachError': needRequest(); service.attachError(id, data.id); break;

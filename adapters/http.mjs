@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { fail } from '../core/errors.mjs';
+import { legacySnapshot } from './reply.mjs';
 
 async function body(req) {
   const chunks = []; let size = 0;
@@ -18,7 +19,7 @@ export async function startApi(service, { activity } = {}) {
       const candidate = Buffer.from(req.headers.authorization?.replace(/^Bearer /, '') || '');
       fail(candidate.length === token.length && timingSafeEqual(candidate, Buffer.from(token)), 'E_AUTH', '需要本地访问令牌。', 401);
       const url = new URL(req.url, 'http://127.0.0.1');
-      if (req.method === 'GET' && url.pathname === '/health') return send(200, { name: 'human_cli', pid: process.pid, version: '1.1.0' });
+      if (req.method === 'GET' && url.pathname === '/health') return send(200, { name: 'human_cli', pid: process.pid, version: '2.0.3' });
       if (req.method === 'GET' && url.pathname === '/plugins') return send(200, service.plugins.list());
       if (req.method === 'GET' && url.pathname === '/logs') return send(200, service.logs({ limit: Number(url.searchParams.get('limit') || 50), offset: Number(url.searchParams.get('offset') || 0) }));
       if (req.method === 'GET' && url.pathname === '/requests') return send(200, service.list());
@@ -41,7 +42,8 @@ export async function startApi(service, { activity } = {}) {
         return;
       }
       if (req.method === 'GET' && action === 'result') {
-        const request = service.snapshot(id), result = request.result;
+        if (url.searchParams.get('format') !== 'legacy') return send(200, service.reply(id));
+        const request = legacySnapshot(service.snapshot(id)), result = request.result;
         let imagePage;
         if (result) {
           const paged = url.searchParams.has('imageOffset'), offset = Number(url.searchParams.get('imageOffset') || 0);
@@ -56,7 +58,7 @@ export async function startApi(service, { activity } = {}) {
           });
           if (paged) imagePage = { offset, count: next - offset, total: result.images.length, nextOffset: next < result.images.length ? next : null };
         }
-        return send(200, { requestId: id, status: request.status, cache: request.cache, cancelReason: request.cancelReason, result, ...(imagePage ? { imagePage } : {}) });
+        return send(200, { requestId: id, status: request.status, cache: request.cache, cancelReason: request.cancelReason, ...(request.cancelledBy ? { cancelledBy: request.cancelledBy } : {}), result, ...(imagePage ? { imagePage } : {}) });
       }
       fail(false, 'E_ROUTE', '接口不存在。', 404);
     } catch (error) { if (!res.destroyed) { if (res.headersSent) res.end(JSON.stringify({ error: { code: error.code || 'E_WAIT', message: error.message } })); else send(error.status || (error.name === 'ZodError' ? 400 : 500), { error: { code: error.code || 'E_INPUT', message: error.message } }); } }

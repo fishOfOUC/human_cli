@@ -10,6 +10,7 @@ import { startWebConfigProvider } from './fixtures/web-config-provider.mjs';
 
 const output = resolve('.qa', `config-ui-${randomUUID().slice(0, 8)}`);
 process.env.HUMAN_CLI_DATA_DIR = join(output, 'data');
+process.env.HUMAN_CLI_CACHE_DIR = join(output, 'cache');
 mkdirSync(join(process.env.HUMAN_CLI_DATA_DIR, 'plugins'), { recursive: true });
 const provider = await startWebConfigProvider();
 writeFileSync(join(process.env.HUMAN_CLI_DATA_DIR, 'plugins', 'providers.json'), JSON.stringify({ version: 1, providers: [{ id: 'test-web-config', url: provider.url, token: provider.token }] }));
@@ -117,9 +118,9 @@ async function run() {
     const rect = await js(win.webContents, '(()=>{const r=document.querySelector("[data-config-ui-host]").getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}})()');
     const nativeView = win.contentView.children.find((view) => view.webContents === guest), bounds = nativeView.getBounds();
     check('Native provider view follows shared-pane resizing and DIP bounds', Math.abs(rect.x - bounds.x) <= 1 && Math.abs(rect.y - bounds.y) <= 1 && Math.abs(rect.width - bounds.width) <= 1 && Math.abs(rect.height - bounds.height) <= 1);
-    await api(`/requests/${request.id}/cancel`, 'POST', { reason: '配置测试结束' });
+    await js(win.webContents, 'document.querySelector("[data-action=close]").click()');
     await until(() => guest.isDestroyed() && provider.sessions.size === 0);
-    check('AI cancellation closes and invalidates the configuration editor', true);
+    check('User close cancels its request and invalidates the configuration editor', (await api(`/requests/${request.id}`)).cancelledBy === 'user');
     check('Host renderer remains alive', failures.length === 0);
     writeFileSync(join(output, 'report.json'), JSON.stringify({ passed: checks.length, checks, failures }, null, 2));
     console.log(`CONFIG UI REPORT ${join(output, 'report.json')}`);

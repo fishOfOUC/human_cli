@@ -13,8 +13,8 @@ export const createSchema = z.object({
   idempotencyKey: z.string().min(1).max(200).optional(),
 });
 export const updateSchema = z.object({
-  title: createSchema.shape.title.optional(), description: createSchema.shape.description.optional(),
-  steps: createSchema.shape.steps.optional(), context: createSchema.shape.context.optional(),
-  expectation: createSchema.shape.expectation.optional(), project: createSchema.shape.project.optional(),
+  title: createSchema.shape.title.optional(), description: createSchema.shape.description.removeDefault().optional(),
+  steps: createSchema.shape.steps.removeDefault().optional(), context: createSchema.shape.context.removeDefault().optional(),
+  expectation: createSchema.shape.expectation.removeDefault().optional(), project: createSchema.shape.project.removeDefault().optional(),
 });
 export const themes = ['paper', 'sage', 'light', 'dark'];

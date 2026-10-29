@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { fail } from '../core/errors.mjs';
+import { MAX_IMAGE_BYTES, MAX_FILE_BYTES, isPreviewImage } from '../core/content.mjs';
 
 export const SPI_VERSION = 1;
 export const MAX_RESPONSE_BYTES = 64 * 1024 * 1024;
@@ -38,7 +39,8 @@ export function encodeOutput(output) {
   fail(output && typeof output.text === 'string' && output.text.length <= 100000, 'E_SPI_OUTPUT', '插件结果必须包含不超过 100000 字符的 text。');
   fail(Array.isArray(output.attachments || []) && (output.attachments || []).length <= 8, 'E_SPI_OUTPUT', '每次插件结果最多 8 个附件。');
   return { text: output.text, attachments: (output.attachments || []).map((a) => {
-    const bytes = Buffer.from(a.bytes); fail(bytes.length <= 5 * 1024 * 1024, 'E_SPI_SIZE', '单个插件附件不能超过 5 MB。');
+    const bytes = Buffer.from(a.bytes), preview = isPreviewImage(a.mime);
+    fail(bytes.length <= (preview ? MAX_IMAGE_BYTES : MAX_FILE_BYTES) && (!preview || bytes.length > 0), 'E_SPI_SIZE', '插件图片限制为 1 字节至 5 MiB，普通文件最多 20 MiB。');
     return { name: a.name, mime: a.mime, data: bytes.toString('base64') };
   }) };
 }
@@ -46,8 +48,10 @@ export function decodeOutput(output) {
   fail(output && typeof output.text === 'string' && output.text.length <= 100000, 'E_SPI_OUTPUT', 'SPI 结果缺少有效 text。');
   fail(Array.isArray(output.attachments || []) && (output.attachments || []).length <= 8, 'E_SPI_OUTPUT', 'SPI 结果最多包含 8 个附件。');
   return { text: output.text, attachments: (output.attachments || []).map((a) => {
-    fail(typeof a.data === 'string' && a.data.length <= 7 * 1024 * 1024 && a.data.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(a.data), 'E_SPI_ATTACHMENT', '附件必须为有效 Base64。');
-    const bytes = Buffer.from(a.data, 'base64'); fail(bytes.toString('base64') === a.data, 'E_SPI_ATTACHMENT', '附件 Base64 编码不规范。'); fail(bytes.length > 0 && bytes.length <= 5 * 1024 * 1024, 'E_SPI_SIZE', '附件必须为 1 字节至 5 MB。');
+    fail(typeof a.data === 'string' && a.data.length <= Math.ceil(MAX_FILE_BYTES / 3) * 4 && a.data.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(a.data), 'E_SPI_ATTACHMENT', '附件必须为有效 Base64。');
+    const bytes = Buffer.from(a.data, 'base64'); fail(bytes.toString('base64') === a.data, 'E_SPI_ATTACHMENT', '附件 Base64 编码不规范。');
+    const preview = isPreviewImage(a.mime);
+    fail(bytes.length <= (preview ? MAX_IMAGE_BYTES : MAX_FILE_BYTES) && (!preview || bytes.length > 0), 'E_SPI_SIZE', '插件图片限制为 1 字节至 5 MiB，普通文件最多 20 MiB。');
     fail(typeof a.name === 'string' && typeof a.mime === 'string', 'E_SPI_ATTACHMENT', '附件缺少 name 或 mime。');
     return { name: a.name, mime: a.mime, bytes };
   }) };

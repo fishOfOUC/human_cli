@@ -43,7 +43,7 @@ test('a lost creation response retries with the same idempotency key and creates
   assert.equal(result.code, 0, result.stderr);
   assert.equal(service.list().length, 1); assert.equal(keys.length, 2);
   assert.ok(keys[0]); assert.equal(keys[0], keys[1]);
-  assert.equal(JSON.parse(result.stdout).id, service.list()[0].id);
+  assert.equal(JSON.parse(result.stdout).requestId, service.list()[0].id);
 });
 async function until(check) {
   for (let attempt = 0; attempt < 200; attempt++) { const value = check(); if (value) return value; await new Promise((done) => setTimeout(done, 10)); }
@@ -61,10 +61,12 @@ test('CLI request is one blocking human interaction and never returns while the 
   service.addImage(request.id, { name: 'proof.png', mime: 'image/png', bytes: png });
   service.complete(request.id, { version: 1, reply: '我已验收' });
   const result = await command.done, value = JSON.parse(result.stdout);
-  assert.equal(result.code, 0); assert.equal(value.status, 'completed'); assert.equal(value.result.reply, '我已验收');
+  assert.equal(result.code, 0); assert.equal(value.status, 'completed'); assert.equal(value.content[0].text, '我已验收');
+  assert.deepEqual(Object.keys(value).sort(), ['content', 'requestId', 'schemaVersion', 'status']);
   assert.equal(JSON.parse(result.stderr).event, 'waiting_for_user');
-  const cached = JSON.parse(readFileSync(value.cache.replyPath, 'utf8'));
-  assert.deepEqual(readFileSync(cached.images[0].path), png);
+  const cached = JSON.parse(readFileSync(service.logs().entries[0].cache.replyPath, 'utf8'));
+  assert.deepEqual(cached, value);
+  assert.deepEqual(readFileSync(cached.content[1].path), png);
 });
 
 test('CLI only returns immediately with explicit --background, including stdin and file forms', async (t) => {
@@ -74,7 +76,7 @@ test('CLI only returns immediately with explicit --background, including stdin a
   for (const args of [['request', '-', '--background'], ['request', '--background', file]]) {
     const result = await run(args, input).done, request = JSON.parse(result.stdout);
     assert.equal(result.code, 0); assert.equal(request.status, 'pending'); assert.equal(result.stderr, '');
-    assert.equal(service.snapshot(request.id).receiver.waiting, false);
+    assert.equal(service.snapshot(request.requestId).receiver.waiting, false);
   }
 });
 
@@ -95,5 +97,17 @@ test('disconnecting a default CLI request leaves human work and subsequent cache
   assert.equal(service.get(request.id).status, 'pending');
   service.complete(request.id, { version: 1, reply: '稍后完成' });
   const logs = JSON.parse((await run(['logs']).done).stdout);
-  assert.equal(JSON.parse(readFileSync(logs.entries[0].cache.replyPath, 'utf8')).reply, '稍后完成');
+  assert.equal(JSON.parse(readFileSync(logs.entries[0].cache.replyPath, 'utf8')).content[0].text, '稍后完成');
+});
+
+test('CLI wait/result share the new reply and explicit legacy retains the previous snapshot/image output', async (t) => {
+  const { service, run } = await setup(t), r = service.create({ title: 'compatibility', plugins: [] });
+  service.addImage(r.id, { name: 'proof.png', mime: 'image/png', bytes: png }); service.complete(r.id, { version: 1, reply: '正文' });
+  const waiting = JSON.parse((await run(['wait', r.id]).done).stdout);
+  const result = JSON.parse((await run(['result', r.id]).done).stdout);
+  assert.deepEqual(waiting, result);
+  const oldWait = JSON.parse((await run(['wait', r.id, '--format', 'legacy']).done).stdout);
+  const oldResult = JSON.parse((await run(['result', r.id, '--format', 'legacy']).done).stdout);
+  assert.equal(oldWait.result.reply, '正文'); assert.equal(oldWait.content, undefined); assert.equal(oldWait.result.content, undefined);
+  assert.equal(oldResult.result.images[0].data, png.toString('base64'));
 });

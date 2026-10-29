@@ -16,3 +16,9 @@ release/
 __pycache__/
 *.pyc
 .human-cli-data/
+
+# Local AI client configuration
+/.mcp.json
+/.codebuddy/
+/.claude/
+/.codex/

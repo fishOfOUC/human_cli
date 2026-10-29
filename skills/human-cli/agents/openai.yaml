@@ -1,0 +1,4 @@
+interface:
+  display_name: "human_cli 用户协助"
+  short_description: "请求用户操作软件、游戏或网页，通过 MCP/CLI 接收图文文件回复，并配置便签启动插件"
+  default_prompt: "使用 $human-cli，将当前需要人工操作的步骤交给用户，并读取回复继续完成任务。"

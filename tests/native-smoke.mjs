@@ -12,6 +12,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 
 const output = resolve('.qa', `native-${randomUUID().slice(0, 8)}`);
 mkdirSync(output, { recursive: true }); process.env.HUMAN_CLI_DATA_DIR = join(output, 'data');
+process.env.HUMAN_CLI_CACHE_DIR = join(output, 'cache');
 const checks = [], errors = [];
 const check = (name, value) => { assert.ok(value, name); checks.push(name); console.log(`PASS ${name}`); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -70,10 +71,10 @@ try {
   await until(() => js(win, 'document.documentElement.dataset.theme==="sage"'));
   check('Theme change propagates to all native notes', await js(home, 'document.documentElement.dataset.theme==="sage"'));
   await js(win, 'document.querySelector("#nav-note").click()');
-  // Exercise actual renderer file, paste and drop handlers, not service internals.
-  await js(win, `(async()=>{const r=await fetch(${JSON.stringify(captured.images[0].url)});const blob=await r.blob();window.__testImage=blob;const dt=new DataTransfer();dt.items.add(new File([blob],'上传验收.png',{type:'image/png'}));const input=document.querySelector('#image-input');input.files=dt.files;input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  // Exercise reply-area drop, paste and whole-paper drop without file-picker controls.
+  await js(win, `(async()=>{const r=await fetch(${JSON.stringify(captured.images[0].url)});const blob=await r.blob();window.__testImage=blob;const dt=new DataTransfer();dt.items.add(new File([blob],'回复区拖入.png',{type:'image/png'}));document.querySelector('#reply').dispatchEvent(new DragEvent('drop',{dataTransfer:dt,bubbles:true,cancelable:true}));})()`);
   await until(async () => (await api(`/requests/${request.id}`)).images.length === 2);
-  check('Image upload crosses real IPC and persists a second attachment', true);
+  check('Image dropped into the reply area crosses real IPC and persists a second attachment', true);
   await js(win, `(()=>{const dt=new DataTransfer();dt.items.add(new File([window.__testImage],'粘贴验收.png',{type:'image/png'}));document.querySelector('#reply').dispatchEvent(new ClipboardEvent('paste',{clipboardData:dt,bubbles:true,cancelable:true}));})()`);
   await until(async () => (await api(`/requests/${request.id}`)).images.length === 3);
   check('Image paste handler persists through real IPC', true);
@@ -93,16 +94,12 @@ try {
   check('Native move and resize are persisted on a stable DPI grid', Math.abs(remembered.width - win.getBounds().width) <= 2 && Math.abs(remembered.height - win.getBounds().height) <= 2);
   await js(win, 'document.querySelector("[data-action=complete]").click()');
   const result = await waiting;
-  let metadata = JSON.parse(result.content[0].text), receivedImages = result.content.filter((c) => c.type === 'image');
-  while (metadata.imagePage?.nextOffset !== null && metadata.imagePage?.nextOffset !== undefined) {
-    const page = await client.callTool({ name: 'human_wait', arguments: { requestId: request.id, imageOffset: metadata.imagePage.nextOffset } });
-    metadata = JSON.parse(page.content[0].text); receivedImages.push(...page.content.filter((c) => c.type === 'image'));
-  }
-  check('Native user completion returns real images to MCP client', !result.isError && receivedImages.length === 4 && result.content[0].text.includes('原生验收已完成'));
+  const metadata = JSON.parse(result.content[0].text), receivedImages = metadata.content.filter((c) => c.type === 'image');
+  check('Native user completion returns readable image paths to MCP client', !result.isError && result.content.length === 1 && receivedImages.length === 4 && result.content[0].text.includes('原生验收已完成'));
   const logs = JSON.parse((await client.callTool({ name: 'human_logs', arguments: {} })).content[0].text);
   const cached = logs.entries.find((entry) => entry.id === request.id);
   const cachedReply = JSON.parse(readFileSync(cached.cache.replyPath, 'utf8'));
-  check('Native reply is recoverable through logs and local image files without acknowledgement', cachedReply.reply === '原生验收已完成' && cachedReply.images.length === 4 && readFileSync(cachedReply.images[0].path).length > 100);
+  check('Native reply is recoverable through logs and local image files without acknowledgement', cachedReply.content.some((b) => b.text === '原生验收已完成') && cachedReply.content.filter((b) => b.type === 'image').length === 4 && readFileSync(receivedImages[0].path).length > 100);
   await until(() => win.isDestroyed());
   check('Completed note disappears without a result window; another request stays visible', !home.isDestroyed() && home.isVisible());
   const second = await api('/requests', 'POST', { title: '检查位置恢复' });
@@ -119,7 +116,7 @@ try {
   await until(async () => (await api(`/requests/${offline.id}`)).status === 'completed');
   await until(() => offlineWin.isDestroyed());
   const offlineSaved = await api(`/requests/${offline.id}`);
-  check('Disconnected reply is saved before its note disappears', offlineSaved.cache.state === 'saved' && JSON.parse(readFileSync(offlineSaved.cache.replyPath, 'utf8')).reply === '这份回复先保存在本机');
+  check('Disconnected reply is saved before its note disappears', offlineSaved.cache.state === 'saved' && JSON.parse(readFileSync(offlineSaved.cache.replyPath, 'utf8')).content[0].text === '这份回复先保存在本机');
   let cliClosed = false, cliOutput = '', cliError = '';
   cliProcess = spawn(process.execPath, [resolve('adapters/cli.mjs'), 'request', '-'], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', HUMAN_CLI_NO_AUTOSTART: '1' }, stdio: 'pipe' });
   cliProcess.stdout.setEncoding('utf8').on('data', (chunk) => { cliOutput += chunk; });
@@ -134,7 +131,7 @@ try {
   check('Single CLI request remains active while native user is still drafting', !cliClosed && cliOutput === '');
   await js(blockingWin, 'document.querySelector("#reply").value="我已验收";document.querySelector("#reply").dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("[data-action=complete]").click()');
   const cliCode = await cliFinished, cliResult = JSON.parse(cliOutput);
-  check('Native completion returns reply to the same CLI request without a second wait call', cliCode === 0 && cliResult.status === 'completed' && cliResult.result.reply === '我已验收' && cliError.includes('waiting_for_user'));
+  check('Native completion returns reply to the same CLI request without a second wait call', cliCode === 0 && cliResult.status === 'completed' && cliResult.content[0].text === '我已验收' && cliError.includes('waiting_for_user'));
   await api(`/requests/${keeper.id}/cancel`, 'POST', { reason: '并行任务验收结束' });
   await until(() => home.isDestroyed());
   check('No native renderer errors', errors.length === 0);

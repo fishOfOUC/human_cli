@@ -38,7 +38,7 @@ test('only-complete deliberately omits prepared reply and images', (t) => {
   const { service } = fixture(t), r = service.create({ title: 'x' });
   service.addImage(r.id, { name: 'x.png', mime: 'image/png', bytes: png });
   const { result } = service.complete(r.id, { version: 1, only: true, reply: '不回传' });
-  assert.equal(result.reply, '已完成'); assert.equal(result.images.length, 0);
+  assert.equal(result.reply, ''); assert.equal(result.images.length, 0); assert.deepEqual(result.content, []);
 });
 test('wait resolves on cancellation; disconnect removes listener without ending human request', async (t) => {
   const { service } = fixture(t), r = service.create({ title: 'x' });

@@ -16,6 +16,7 @@ process.on('message', async ({ id, action, requestId, text }) => {
     if (action === 'windows') value = windows();
     else if (action === 'draft') value = await win.webContents.executeJavaScript(`document.querySelector('#reply').value=${JSON.stringify(text)};document.querySelector('#reply').dispatchEvent(new Event('input',{bubbles:true}));true`);
     else if (action === 'complete') value = await win.webContents.executeJavaScript("document.querySelector('[data-action=complete]').click();true");
+    else if (action === 'close') { win.close(); value = true; }
     else if (action === 'minimize') { win.minimize(); value = true; }
     else if (action === 'restore') { win.restore(); value = true; }
     else if (action === 'resize') { win.setBounds({ ...win.getBounds(), width: 420, height: 390 }); value = { bounds: win.getBounds(), scaleFactor: screen.getDisplayMatching(win.getBounds()).scaleFactor }; }

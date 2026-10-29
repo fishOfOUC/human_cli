@@ -1,0 +1,8 @@
+{
+  "pluginId": "example.launch-preview",
+  "name": "启动操作程序",
+  "program": "powershell.exe",
+  "args": ["-NoLogo", "-NoProfile", "-File", "manual-step.ps1"],
+  "cwd": ".",
+  "showConsole": true
+}

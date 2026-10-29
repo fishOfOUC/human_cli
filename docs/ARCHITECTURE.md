@@ -1,6 +1,6 @@
 # human_cli 架构
 
-human_cli 是由 AI 管理的人机协作工具。AI 创建、更新、取消请求；人读取说明、操作辅助工具、附图回复并完成。只有未完成任务显示便签；完成或取消即销毁窗口，不提供主界面、托盘或用户创建便签的入口。
+human_cli 是由 AI 管理的人机协作工具。AI 创建、更新、取消请求；人读取说明、操作辅助工具、附图回复并完成，也可关闭当前请求。只有未完成任务显示便签；完成或取消即销毁窗口，不提供主界面、托盘或用户创建便签的入口。
 
 ```mermaid
 flowchart LR
@@ -46,15 +46,17 @@ AI 接口与插件接口是两条不同链路。本机 AI HTTP 接口绑定 loop
 
 请求状态为 pending → completed / cancelled；回复缓存状态为 not_ready → saved → discarded。没有交付确认、回执或已读状态。AI 自己判断工具调用是否成功。
 
-core/cache.mjs 为每张便签维护 cache/<requestId>/request.json，完成后写入 reply.json，附件复制到同目录的 attachments 下。JSON 原子写入、UTF-8 编码，包含附件绝对路径；AI 不依赖运行中的桌面端即可读取。state.json 仍是可恢复的持久状态，启动时重建缓存并迁移旧版记录。
+core/cache.mjs 默认在软件目录/cache 为每张便签维护 <requestId>/request.json，完成后将精简对外回复写入 reply.json，附件复制到同目录的 attachments 下。状态数据目录与回复缓存根目录独立，HUMAN_CLI_CACHE_DIR 可显式覆盖缓存根目录。草稿与完成快照使用有序内容块，内部保留兼容 reply/images/diagnostics 供完整查询；core/reply.mjs 统一精简投影，CLI 与 MCP 默认只返回有序内容和附件绝对路径，不编码传输图片。JSON 原子写入、UTF-8 编码，包含附件绝对路径；AI 不依赖运行中的桌面端即可读取。state.json 仍是可恢复的持久状态，启动时重建缓存并迁移旧版记录。
 
 human_logs / GET /logs 按创建时间倒序返回标题、时间、状态和缓存位置，支持 limit/offset 分页。AI 重启后即使不知道 requestId，也能定位自己需要的文件。为避免猜测传输是否成功，所有回复统一保存；读取不删除缓存。
 
-用户可明确丢弃缓存回复，删除 reply.json、回复文字和诊断，以及不再被独立工具结果引用的图片。请求日志和独立工具结果保留，标记 discarded；丢弃不冒充 AI 取消，也不能撤回此前已被读取的内容。
+用户可明确丢弃缓存回复，删除 reply.json、回复文字和诊断，以及不再被其他内容块或独立工具结果引用的图片/文件。请求日志和独立工具结果保留，标记 discarded；丢弃不冒充 AI 取消，也不能撤回此前已被读取的内容。
 
-adapters/human.mjs 统一 CLI 与 MCP 的协助语义：request/human_request 默认创建后等待最终回复。后台创建是显式选项，CLI 为 --background，MCP 为 background: true。human_wait 用于恢复或补取图片，不是正常请求的必需第二步。
+adapters/human.mjs 统一 CLI 与 MCP 的协助语义：request/human_request 默认创建后等待最终回复。后台创建是显式选项，CLI 为 --background，MCP 为 background: true。human_wait 用于恢复已有请求，不是正常请求的必需第二步。
 
-请求不设用户完成期限。human_wait 等到用户完成或 AI 取消；连接断开只清理监听。MCP 宿主可能有自己的超时，AI 可重新连接读取缓存日志，或通过原 requestId 再次取回。大图片仍分页回传。
+adapters/mcp-schema.mjs 将模型声明与运行校验分离：通过 SDK 的公开 tools/list 处理器发布 strict 兼容的闭合 JSON Schema；registerTool 仍执行原有 Zod 校验、默认值、取消及错误处理。声明中的可选字段为 required+nullable，入参 null 按省略处理；原来的省略写法继续有效。任意插件 config 在模型声明中为 JSON 对象字符串，服务端同时接受旧对象，并保留配置内部的 null。长度、UUID、正则和范围说明转入 description，真正的约束仍由原 Schema 执行。
+
+请求不设用户完成期限。human_wait 等到用户完成、AI 取消或用户主动关闭；连接断开只清理监听。MCP 宿主可能有自己的超时，AI 可重新连接读取缓存日志，或通过原 requestId 再次取回。默认图片/文件返回缓存路径，旧图片分页仅在显式 legacy 下保留。
 
 AI 更新说明增加 version，用户完成携带看到的版本；idempotencyKey 避免重试创建重复窗口。AI 更新/取消或用户完成会尽力停止相应插件作业，后到结果不能污染已完成回复快照。
 
@@ -68,7 +70,7 @@ AI 更新说明增加 version，用户完成携带看到的版本；idempotencyK
 
 ## 原生窗口和主题
 
-纸面约 320 × 360 DIP，加两侧书签共 380 × 360 DIP。左键运行，右键共用详情区域；不自动抢换当前内页。临时收起最小化到任务栏。完成/取消后销毁窗口；没有未完成任务且 HTTP 响应传完后进程退出。详见 [LIFECYCLE.md](LIFECYCLE.md)。
+纸面约 320 × 360 DIP，加两侧书签共 380 × 360 DIP。左键运行，右键共用详情区域；不自动抢换当前内页。临时收起最小化到任务栏；标题栏另有关闭按钮，通过可信 IPC 调用 closeByUser，仅取消当前任务并标记 cancelledBy=user，原生关闭走同一路径。完成/取消后销毁窗口；没有未完成任务且 HTTP 响应传完后进程退出。详见 [LIFECYCLE.md](LIFECYCLE.md)。
 
 保存正常窗口 bounds、显示器 ID、工作区和 scaleFactor。Electron 坐标已是 DIP，不重复乘 DPI。显示器断开时按交集或主屏恢复，夹到工作区；监听显示器增减与度量变化。Windows 初次无边框调整被校正，尺寸落在可表示 DPI 网格，避免反复恢复时累积变大。
 
@@ -76,7 +78,7 @@ Windows 截图使用 Electron 提供的物理显示器矩形和固定 System.Dra
 
 ## 数据
 
-默认 `%LOCALAPPDATA%\human_cli`，可用 HUMAN_CLI_DATA_DIR 覆盖。state.json 保存请求、回复、偏好和插件配置；attachments 保存原始附件；cache 保存按便签组织的 JSON 与附件副本；plugins/providers.json 配置网络服务；runtime.json 保存本次 AI 接口地址和令牌。
+默认 `%LOCALAPPDATA%\human_cli`，可用 HUMAN_CLI_DATA_DIR 覆盖。state.json 保存请求、回复、偏好和插件配置；attachments 保存原始附件；软件目录/cache 保存按便签组织的 JSON 与附件副本；plugins/providers.json 配置网络服务；runtime.json 保存本次 AI 接口地址和令牌。
 
 目前是本机单用户、单写者的原子 JSON 存储。网络插件可以在其他机器；AI 请求通道本身尚未扩展成远程多租户服务。未实现热重载、自动安装外部服务、签名安装器或自动更新。
 

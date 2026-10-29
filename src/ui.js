@@ -2,14 +2,14 @@ import {
   createIcons, NotebookPen, Plus, ChevronRight, StickyNote, Pin, Minus, X,
   Grip, RotateCcw, Info, ExternalLink, Copy, ScanLine, Terminal, RotateCw,
   LoaderCircle, CircleAlert, Check, CornerDownLeft, ImagePlus, Bot,
-  FileWarning, Sun, Moon, Download, PinOff, ArrowLeft, Puzzle, FileText, Settings, Send,
+  FileWarning, Sun, Moon, Download, PinOff, ArrowLeft, ArrowUp, ArrowDown, File, Puzzle, FileText, Settings, Send,
 } from 'lucide';
 
 const icons = {
   NotebookPen, Plus, ChevronRight, StickyNote, Pin, Minus, X, Grip,
   RotateCcw, Info, ExternalLink, Copy, ScanLine, Terminal, RotateCw,
   LoaderCircle, CircleAlert, Check, CornerDownLeft, ImagePlus, Bot,
-  FileWarning, Sun, Moon, Download, PinOff, ArrowLeft, Puzzle, FileText, Settings, Send,
+  FileWarning, Sun, Moon, Download, PinOff, ArrowLeft, ArrowUp, ArrowDown, File, Puzzle, FileText, Settings, Send,
 };
 
 export const $ = (selector, root = document) => root.querySelector(selector);

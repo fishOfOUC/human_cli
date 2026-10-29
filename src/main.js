@@ -1,13 +1,20 @@
 import { $, esc, icon, refreshIcons } from './ui.js';
-import { railHTML, panelHTML, draftLabels, progressHTML } from './views.js';
+import { railHTML, panelHTML, progressHTML } from './views.js';
 import { applyTheme } from './themes.js';
+import { ReplyEditor } from './reply-editor.js';
 import './style.css';
 import './desktop.css';
 
 const bridge = window.humanCli;
-const local = { pane: 'note', reply: '', checks: [], requestId: null, version: null, configDrafts: {}, openSettings: new Set(), toolTabs: {}, draftState: 'idle' };
-let state, draftTimer, toastTimer, draftChain = Promise.resolve(), completing = false;
-$('#app').innerHTML = `<main class="note-window" aria-label="AI 协助便签"><header class="window-titlebar"><div class="window-identity">${icon('sticky-note')}<span id="agent-name">human_cli</span></div><div class="window-controls"><button class="icon-button pin-control" data-action="pin" aria-label="切换置顶" title="切换置顶">${icon('pin')}</button><button class="icon-button" data-action="hide" aria-label="最小化到任务栏" title="最小化到任务栏，AI 请求继续等待">${icon('minus')}</button></div></header><div class="note-body"></div>${['n','s','e','w','ne','nw','se','sw'].map(edge => `<div class="resize-edge ${edge}" data-resize-edge="${edge}" aria-hidden="true"></div>`).join('')}<div class="note-toast" role="status" aria-live="polite"></div></main><input id="image-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden />`;
+const local = { pane: 'note', reply: '', checks: [], requestId: null, version: null, configDrafts: {}, openSettings: new Set(), toolTabs: {}, replyHeight: 64, attachmentCount: 0 };
+let state, draftTimer, toastTimer, draftChain = Promise.resolve(), completing = false, closing = false, completionSequence = 0;
+const editor = new ReplyEditor({ upload: (data) => call('uploadAttachment', data), changed: scheduleDraft, render: renderEditor });
+function renderEditor() {
+  const count = editor.blocks.filter((b) => b.type !== 'text').length;
+  if (count > local.attachmentCount) local.replyHeight = Math.max(local.replyHeight, Math.min(320, 100 + count * 90));
+  local.attachmentCount = count; render();
+}
+$('#app').innerHTML = `<main class="note-window" aria-label="AI 协助便签"><header class="window-titlebar"><div class="window-identity">${icon('sticky-note')}<span id="agent-name">human_cli</span></div><div class="window-controls"><button class="icon-button pin-control" data-action="pin" aria-label="切换置顶" title="切换置顶">${icon('pin')}</button><button class="icon-button" data-action="hide" aria-label="最小化到任务栏" title="最小化到任务栏，AI 请求继续等待">${icon('minus')}</button><button class="icon-button close-control" data-action="close" aria-label="关闭此请求" title="关闭此请求并通知 AI，不提交回复">${icon('x')}</button></div></header><div class="note-body"></div>${['n','s','e','w','ne','nw','se','sw'].map(edge => `<div class="resize-edge ${edge}" data-resize-edge="${edge}" aria-hidden="true"></div>`).join('')}<div class="note-toast" role="status" aria-live="polite"></div></main>`;
 
 function toast(text) {
   clearTimeout(toastTimer); $('.note-toast').textContent = text; $('.note-toast').classList.add('visible');
@@ -18,16 +25,20 @@ async function call(method, ...args) {
   if (!response.ok) throw Object.assign(new Error(response.error.message), response.error);
   return response.value;
 }
+let deferredState;
 function receive(next) {
+  if (replyResize) { deferredState = next; return; }
   const request = next.request;
   if (request?.id !== local.requestId) {
+    editor.receive(request?.content, true);
     local.reply = request?.reply || ''; local.checks = request?.checks || [];
-    local.requestId = request?.id || null; local.version = request?.version; local.pane = 'note'; local.draftState = 'idle';
+    local.requestId = request?.id || null; local.version = request?.version; local.pane = 'note'; local.replyHeight = 64; local.attachmentCount = 0;
   } else if (request?.version !== local.version) {
     local.version = request.version; local.checks = [...request.checks];
     if (request.status !== 'pending') local.pane = 'note';
   }
-  state = next; render();
+  else editor.receive(request?.content);
+  state = next; renderEditor();
 }
 function render() {
   if (!state) return;
@@ -36,13 +47,13 @@ function render() {
   const focused = document.activeElement, focusId = focused?.id, hadFocus = document.hasFocus();
   const selection = typeof focused?.selectionStart === 'number' ? [focused.selectionStart, focused.selectionEnd] : null;
   const oldPane = $('#shared-panel')?.dataset.pane, scroll = $('.pane-scroll')?.scrollTop || 0;
-  const request = state.request ? { ...state.request, reply: local.reply, checks: local.checks } : null;
+  const request = state.request ? { ...state.request, content: editor.blocks, checks: local.checks } : null;
   $('.note-body').innerHTML = `${railHTML(request, 'left', local.pane)}<article class="paper" id="shared-panel" role="region" aria-label="便签与工具详情" data-pane="${esc(local.pane)}">${panelHTML({ ...state, request }, local)}</article>${railHTML(request, 'right', local.pane)}`;
   $('#agent-name').textContent = request?.agent || 'human_cli';
   $('.pin-control').innerHTML = icon(state.preferences.pinned ? 'pin' : 'pin-off');
   $('.pin-control').setAttribute('aria-pressed', String(state.preferences.pinned));
-  updateDraftStatus();
   refreshIcons();
+  for (const input of document.querySelectorAll('.reply-blocks:not(.single) textarea')) { input.style.height = 'auto'; input.style.height = `${Math.max(36, input.scrollHeight)}px`; }
   if (oldPane === local.pane) {
     const replacement = focusId && document.getElementById(focusId);
     if (hadFocus) replacement?.focus({ preventScroll: true });
@@ -80,51 +91,61 @@ async function openToolPanel(id) {
 }
 function saveDraft() {
   clearTimeout(draftTimer);
-  if (!state.request || state.request.status !== 'pending') return draftChain;
-  const payload = { reply: local.reply, checks: [...local.checks] };
-  local.draftState = 'saving'; updateDraftStatus();
+  if (closing || !state.request || state.request.status !== 'pending') return draftChain;
+  if (!editor.ready) return draftChain;
+  const payload = { content: editor.serialize(), checks: [...local.checks] };
   draftChain = draftChain.catch(() => {}).then(() => call('draft', payload));
-  draftChain = draftChain.then(() => { if (payload.reply === local.reply && JSON.stringify(payload.checks) === JSON.stringify(local.checks)) local.draftState = 'saved'; updateDraftStatus(); });
-  draftChain = draftChain.catch((error) => { local.draftState = 'error'; updateDraftStatus(); toast(error.message); throw error; });
+  draftChain = draftChain.catch((error) => { toast(error.message); throw error; });
   return draftChain;
-}
-function updateDraftStatus() {
-  const label = $('#draft-state'); if (label) label.textContent = draftLabels[local.draftState];
 }
 function scheduleDraft() {
   clearTimeout(draftTimer);
-  local.draftState = 'saving'; updateDraftStatus();
+  if (closing) return;
   draftTimer = setTimeout(() => { saveDraft().catch(() => { draftChain = Promise.resolve(); }); }, 200);
 }
 async function finish() {
-  if (completing || state.request?.status !== 'pending') return;
+  if (closing || completing || state.request?.status !== 'pending') return;
   const version = state.request.version;
+  const sequence = ++completionSequence;
   completing = true;
   try {
+    await editor.waitReady();
+    if (closing || sequence !== completionSequence) return;
     await saveDraft();
-    await call('complete', { version, reply: local.reply, checks: local.checks });
+    if (closing || sequence !== completionSequence) return;
+    await call('complete', { version, content: editor.serialize(), checks: local.checks });
   } finally { completing = false; }
+}
+async function closeRequest() {
+  if (closing || state?.request?.status !== 'pending') return;
+  const saving = saveDraft();
+  completionSequence++;
+  closing = true; clearTimeout(draftTimer);
+  const button = document.querySelector('[data-action=close]');
+  if (button) button.disabled = true;
+  try { await saving.catch(() => {}); await call('close'); }
+  catch (error) { closing = false; if (button?.isConnected) button.disabled = false; throw error; }
 }
 async function addFiles(files) {
   if (state.request?.status !== 'pending') { toast('当前没有等待协助的请求'); return; }
-  for (const file of files) {
-    if (file.size > 5 * 1024 * 1024) { toast('单张图片需小于 5 MB'); continue; }
-    const mime = file.type || ({ png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp' }[file.name.split('.').at(-1).toLowerCase()]);
-    await call('addImage', { name: file.name || '粘贴的图片.png', mime, bytes: new Uint8Array(await file.arrayBuffer()) });
-  }
+  editor.addFiles(files);
 }
 const actions = {
   pane: (button) => pane(button.dataset.pane),
   hide: () => call('hide'), pin: () => call('preferences', { pinned: !state.preferences.pinned }),
+  close: () => closeRequest(),
   theme: (button) => call('preferences', { theme: button.dataset.theme }),
   motion: () => call('preferences', { motion: state.preferences.motion === false }),
   run: async (button) => { await call('runTool', button.dataset.tool); },
-  upload: () => $('#image-input').click(),
   image: (button) => pane(`image:${button.dataset.id}`),
   'remove-image': (button) => call('removeImage', button.dataset.id),
   'remove-error': (button) => call('removeError', button.dataset.id),
-  'attach-image': (button) => call('attachImage', button.dataset.id),
-  'attach-error': async (button) => { await call('attachError', button.dataset.id); pane('note'); toast('完整错误已附入回复'); },
+  'attach-image': (button) => { const a = state.request.tools.flatMap((t) => t.output?.attachments || []).find((a) => a.id === button.dataset.id); if (a) { editor.insertAttachment(a); pane('note'); } },
+  'attach-error': (button) => { const t = state.request.tools.find((t) => t.id === button.dataset.id); if (t?.error) { editor.insert([{ blockId: crypto.randomUUID(), type: 'diagnostic', toolId: t.id, name: t.manifest.name, ...t.error }]); pane('note'); toast('完整错误已附入回复'); } },
+  'remove-block': (button) => editor.remove(button.dataset.block),
+  'move-block-up': (button) => editor.move(button.dataset.block, -1),
+  'move-block-down': (button) => editor.move(button.dataset.block, 1),
+  'retry-block': (button) => { const b = editor.blocks.find((b) => b.blockId === button.dataset.block); if (b?.file) { editor.startUpload(b); render(); } },
   'copy-error': async (button) => { const error = state.request.tools.find((t) => t.id === button.dataset.id).error; await call('copyText', `${error.code}\n${error.message}\n${error.details || ''}`); toast('完整错误已复制'); },
   save: async (button) => { if (await call('saveResult', button.dataset.id)) toast('结果已保存'); },
   complete: () => finish(),
@@ -156,7 +177,7 @@ function configDraft(form) {
   return config;
 }
 document.addEventListener('input', (event) => {
-  if (event.target.id === 'reply') { local.reply = event.target.value; scheduleDraft(); }
+  if (event.target.matches('[data-text-block]')) { editor.input(event.target); if (!$('.reply-blocks').classList.contains('single')) { event.target.style.height = 'auto'; event.target.style.height = `${Math.max(36, event.target.scrollHeight)}px`; } }
   const form = event.target.closest('.tool-settings-form');
   if (form) { try { local.configDrafts[form.dataset.id] = configDraft(form); } catch {} }
 });
@@ -172,7 +193,6 @@ document.addEventListener('change', (event) => {
     if (progress) progress.outerHTML = progressHTML({ ...state.request, checks: local.checks });
     scheduleDraft();
   }
-  if (event.target.id === 'image-input') { const files = [...event.target.files]; event.target.value = ''; execute(() => addFiles(files)); }
   const form = event.target.closest('.tool-settings-form'); if (form) { try { local.configDrafts[form.dataset.id] = configDraft(form); } catch {} }
 });
 document.addEventListener('toggle', (event) => {
@@ -198,11 +218,58 @@ document.addEventListener('keydown', (event) => {
 });
 document.addEventListener('paste', (event) => {
   if (!state || local.pane !== 'note') return;
-  const files = [...(event.clipboardData?.items || [])].filter((i) => i.type.startsWith('image/')).map((i) => i.getAsFile()).filter(Boolean);
-  if (files.length) { event.preventDefault(); execute(() => addFiles(files)); }
+  const files = [...(event.clipboardData?.items || [])].filter((i) => i.kind === 'file').map((i) => i.getAsFile()).filter(Boolean);
+  if (files.length) { event.preventDefault(); editor.capture(event.target); execute(() => addFiles(files)); }
 });
+for (const name of ['focusin', 'select', 'keyup', 'click']) document.addEventListener(name, (event) => editor.capture(event.target));
 document.addEventListener('dragover', (event) => { if ([...(event.dataTransfer?.types || [])].includes('Files')) event.preventDefault(); });
-document.addEventListener('drop', (event) => { event.preventDefault(); if (event.dataTransfer?.files.length) execute(() => addFiles([...event.dataTransfer.files])); });
+document.addEventListener('drop', (event) => { event.preventDefault(); editor.capture(event.target); if (event.dataTransfer?.files.length) execute(() => addFiles([...event.dataTransfer.files])); });
+let replyResize, replyFrame;
+function setReplyHeight(height) {
+  local.replyHeight = Math.round(Math.max(44, height));
+  $('.composer').style.height = `${local.replyHeight}px`;
+}
+function finishReplyDrag(drag) {
+  if (replyResize !== drag) return;
+  replyResize = null;
+  if (deferredState) { const next = deferredState; deferredState = null; receive(next); }
+}
+async function resizeReplyBottom(drag, final = false) {
+  await drag.ready;
+  if (replyResize !== drag || (drag.ending && !final)) return;
+  const bounds = await call('resize');
+  if (bounds && replyResize === drag) setReplyHeight(drag.height + bounds.height - drag.windowHeight);
+}
+document.addEventListener('pointerdown', (event) => {
+  const edge = event.target.closest('[data-reply-resize]');
+  if (!edge || event.button !== 0 || replyResize) return;
+  event.preventDefault(); edge.setPointerCapture(event.pointerId);
+  const drag = { edge: edge.dataset.replyResize, element: edge, pointerId: event.pointerId, y: event.clientY, height: $('.composer').getBoundingClientRect().height };
+  replyResize = drag;
+  drag.ready = drag.edge === 'bottom' ? call('beginResize', 's', drag.height).then(bounds => { drag.windowHeight = bounds.height; }) : Promise.resolve();
+  drag.ready.catch(error => { finishReplyDrag(drag); toast(error.message); });
+});
+document.addEventListener('pointermove', (event) => {
+  const drag = replyResize;
+  if (!drag || drag.ending || event.pointerId !== drag.pointerId) return;
+  if (drag.edge === 'top') {
+    const max = Math.max(44, $('.paper').clientHeight - 112);
+    setReplyHeight(Math.min(max, drag.height - (event.clientY - drag.y)));
+  } else if (!replyFrame) {
+    replyFrame = requestAnimationFrame(() => { replyFrame = null; execute(() => resizeReplyBottom(drag)); });
+  }
+});
+function endReplyResize(event) {
+  const drag = replyResize;
+  if (!drag || drag.ending || event.pointerId !== drag.pointerId) return;
+  drag.ending = true; cancelAnimationFrame(replyFrame); replyFrame = null;
+  if (drag.element.hasPointerCapture(event.pointerId)) drag.element.releasePointerCapture(event.pointerId);
+  execute(async () => {
+    try { if (drag.edge === 'bottom') { await resizeReplyBottom(drag, true); await call('endResize'); } }
+    finally { finishReplyDrag(drag); }
+  });
+}
+for (const event of ['pointerup','pointercancel','lostpointercapture']) document.addEventListener(event, endReplyResize);
 let resize, resizeFrame;
 document.addEventListener('pointerdown', (event) => {
   const edge = event.target.closest('[data-resize-edge]');
@@ -233,5 +300,6 @@ if (!bridge) {
   $('.note-body').innerHTML = '<article class="paper"><div class="pane-scroll empty-note"><h1>请从桌面端打开 human_cli。</h1><p>运行 npm start，或双击“启动 human_cli.cmd”。AI 调用 MCP 后会自动出现协助便签。</p></div></article>';
 } else {
   bridge.onState(receive);
+  bridge.onCloseRequest(() => execute(closeRequest));
   call('bootstrap').then(receive).catch((error) => toast(error.message));
 }

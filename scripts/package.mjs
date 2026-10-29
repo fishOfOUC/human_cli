@@ -9,7 +9,7 @@ const paths = await packager({
   dir: root, name: 'human_cli', platform: 'win32', arch: 'x64', out: output,
   asar: false, prune: true, overwrite: false,
   // Ship the runtime; keep design references, tests and development launchers in source only.
-  ignore: [/^\/(\.git|\.qa|\.taste-skill|prototype|tests|release|ui__rebuild|scripts)(\/|$)/, /^\/src(\/|$)/, /^\/[^/]+\.(cmd|ps1)$/i],
+  ignore: [/^\/(\.git|\.qa|\.taste-skill|\.codebuddy|\.claude|\.codex|archive|cache|prototype|tests|release|ui__rebuild|scripts)(\/|$)/, /^\/(\.mcp\.json|\.env(?:\..*)?)$/i, /^\/(src|public)(\/|$)/, /^\/[^/]+\.(cmd|ps1)$/i],
   win32metadata: { CompanyName: 'human_cli', FileDescription: 'human_cli AI 协助便签', ProductName: 'human_cli' },
 });
 for (const path of paths) {

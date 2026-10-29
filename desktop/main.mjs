@@ -2,7 +2,7 @@ import { app, protocol, net, session, screen } from 'electron';
 import { dirname, join, resolve, relative, isAbsolute } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { mkdirSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
-import { dataDirectory, runtimePath } from '../core/paths.mjs';
+import { dataDirectory, runtimePath, replyCacheDirectory } from '../core/paths.mjs';
 import { JsonStore } from '../core/store.mjs';
 import { AttachmentStore } from '../core/attachments.mjs';
 import { RequestService } from '../core/requests.mjs';
@@ -36,7 +36,7 @@ else {
   try { configured = readProviders(providerFile); } catch (error) { configError = { folder: 'providers.json', message: error.message }; }
   const host = await new NetworkPluginHost([{ id: 'human.builtin', url: builtinProvider.url, token: builtinProvider.token }, ...configured]).initialize();
   host.loadErrors.push(...legacy.loadErrors, ...(configError ? [configError] : []));
-  const service = new RequestService(store, attachments, host);
+  const service = new RequestService(store, attachments, host, { cacheDirectory: replyCacheDirectory({ packaged: app.isPackaged }) });
   protocol.handle('human-cli-app', (request) => {
     const url = new URL(request.url);
     if (url.hostname !== 'ui') return new Response('Not found', { status: 404 });
@@ -59,7 +59,7 @@ else {
   const lifecycle = new OnDemandLifecycle(() => service.list().some((r) => r.status === 'pending'), () => app.quit());
   registerIpc(service, windows, configUis);
   const api = await startApi(service, { activity: (path) => lifecycle.begin(path) });
-  writeFileSync(runtimePath(), JSON.stringify({ url: api.url, token: api.token, pid: process.pid, version: '1.1.0' }), { mode: 0o600 });
+  writeFileSync(runtimePath(), JSON.stringify({ url: api.url, token: api.token, pid: process.pid, version: '2.0.3' }), { mode: 0o600 });
   service.on('change', ({ id, event }) => {
     if (event === 'created') windows.open(id);
     else if (service.get(id).status !== 'pending') windows.finish(id);

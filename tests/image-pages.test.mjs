@@ -12,7 +12,7 @@ test('large image results paginate below MCP message buffer size without losing 
   const received = [];
   let offset = 0;
   do {
-    const response = await fetch(`${api.url}/requests/${r.id}/result?imageOffset=${offset}`, { headers: { Authorization: `Bearer ${api.token}` } });
+    const response = await fetch(`${api.url}/requests/${r.id}/result?format=legacy&imageOffset=${offset}`, { headers: { Authorization: `Bearer ${api.token}` } });
     const raw = await response.text(); assert.ok(Buffer.byteLength(raw) < 8 * 1024 * 1024);
     const page = JSON.parse(raw); received.push(...page.result.images.filter((image) => image.data));
     offset = page.imagePage.nextOffset;

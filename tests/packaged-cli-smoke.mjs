@@ -1,7 +1,7 @@
 // Run with Node as a test driver. The tested CLI/MCP children have an empty PATH
 // and use only human_cli.exe plus the portable directory's bundled runtime.
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync, existsSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, existsSync, symlinkSync, realpathSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import assert from 'node:assert/strict';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -15,6 +15,7 @@ symlinkSync(resolve(executable, '..'), alias, 'junction');
 const cli = join(alias, 'human_cli.exe');
 const environment = { ...process.env, PATH: '', HUMAN_CLI_DATA_DIR: join(directory, 'data'), HUMAN_CLI_NO_AUTOSTART: '0' };
 delete environment.HUMAN_CLI_DESKTOP_EXE;
+delete environment.HUMAN_CLI_CACHE_DIR;
 const checks = [], check = (name, condition) => { assert.ok(condition, name); checks.push(name); };
 const invoke = (args, input) => new Promise((resolveResult, reject) => {
   const child = spawn(cli, args, { env: environment, windowsHide: true, stdio: 'pipe' });
@@ -37,15 +38,18 @@ try {
   const file = join(directory, '便签 请求.json');
   writeFileSync(file, JSON.stringify({ title: 'EXE 文件请求：中文与空格', plugins: [] }));
   const request = await json(['request', file, '--background']);
-  check('Unicode executable and JSON input paths work', request.title === 'EXE 文件请求：中文与空格');
+  request.id = request.requestId;
+  check('Unicode executable and JSON input paths work', (await json(['get', request.id])).title === 'EXE 文件请求：中文与空格');
   const stdin = await json(['request', '-', '--background'], JSON.stringify({ title: '标准输入 "引号" \\ & $()', plugins: [] }));
-  check('UTF-8 stdin creates request without shell interpolation', stdin.title === '标准输入 "引号" \\ & $()');
+  stdin.id = stdin.requestId;
+  check('UTF-8 stdin creates request without shell interpolation', (await json(['get', stdin.id])).title === '标准输入 "引号" \\ & $()');
   check('Native get returns clean JSON on stdout', (await json(['get', request.id])).status === 'pending');
   check('Native list contains created requests', (await json(['list'])).length === 2);
   const logs = await json(['logs', '1', '0']);
   check('Native logs paginate and locate readable cache', logs.total === 2 && logs.entries.length === 1 && JSON.parse(readFileSync(logs.entries[0].cache.requestPath, 'utf8')).id === logs.entries[0].id);
+  check('Default reply cache belongs to the portable software directory', realpathSync(logs.cacheDirectory) === realpathSync(resolve(executable, '..', 'cache')));
   const result = await json(['result', request.id]);
-  check('Native result exposes state and cache location', result.result === null && result.cache.requestPath.endsWith('request.json'));
+  check('Native pending result exposes only the compact public envelope', result.status === 'pending' && result.requestId === request.id && result.schemaVersion === 1 && Object.keys(result).length === 3);
   const waiting = json(['wait', request.id]);
   let connected = false;
   for (let attempt = 0; attempt < 30; attempt++) {
@@ -70,7 +74,9 @@ try {
   check('Native request returns final cancellation in the same call', (await normal).status === 'cancelled');
   client = new Client({ name: 'native-exe-mcp-test', version: '1' });
   await client.connect(new StdioClientTransport({ command: cli, args: ['mcp'], env: environment, stderr: 'pipe' }));
-  check('EXE mcp starts stdio server without system Node', (await client.listTools()).tools.length === 8);
+  const packagedTools = (await client.listTools()).tools;
+  check('EXE mcp starts stdio server without system Node', packagedTools.length === 8);
+  check('Packaged MCP publishes closed strict-compatible root schemas', packagedTools.every((tool) => tool.inputSchema.additionalProperties === false && JSON.stringify([...tool.inputSchema.required].sort()) === JSON.stringify(Object.keys(tool.inputSchema.properties).sort())));
   let mcpSettled = false;
   const mcpRequest = client.callTool({ name: 'human_request', arguments: { title: 'MCP 默认等待验收', plugins: [] } }).then((value) => { mcpSettled = true; return value; });
   let mcpId;

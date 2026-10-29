@@ -17,11 +17,11 @@ test('logs locate standalone UTF-8 request and reply caches with original binary
   service.addImage(request.id, { name: '现场.png', mime: 'image/png', bytes: png });
   service.complete(request.id, { version: 1, reply: '中文操作说明已保存' });
   const entry = service.logs().entries[0], saved = json(entry.cache.replyPath);
-  assert.ok(isAbsolute(entry.cache.directory)); assert.ok(isAbsolute(saved.images[0].path));
-  assert.equal(entry.cache.state, 'saved'); assert.equal(saved.title, request.title);
-  assert.equal(saved.reply, '中文操作说明已保存'); assert.deepEqual(readFileSync(saved.images[0].path), png);
-  assert.ok(saved.images[0].path.startsWith(join(entry.cache.directory, 'attachments')));
-  assert.equal(json(entry.cache.requestPath).result.reply, saved.reply);
+  assert.ok(isAbsolute(entry.cache.directory)); assert.ok(isAbsolute(saved.content[1].path));
+  assert.equal(entry.cache.state, 'saved'); assert.equal(entry.title, request.title);
+  assert.equal(saved.content[0].text, '中文操作说明已保存'); assert.deepEqual(readFileSync(saved.content[1].path), png);
+  assert.ok(saved.content[1].path.startsWith(join(entry.cache.directory, 'attachments')));
+  assert.equal(json(entry.cache.requestPath).result.reply, saved.content[0].text);
 });
 
 test('recent logs paginate by creation time, independent of later draft updates', (t) => {
@@ -48,14 +48,14 @@ test('restart migrates previous receipts and rebuilds missing cache from durable
   const entry = reopened.logs().entries[0];
   assert.equal(entry.cache.state, 'saved'); assert.equal(reopened.get(request.id).delivery, undefined);
   const saved = json(entry.cache.replyPath);
-  assert.equal(saved.reply, '保留旧数据'); assert.deepEqual(readFileSync(saved.images[0].path), png);
+  assert.equal(saved.content[0].text, '保留旧数据'); assert.deepEqual(readFileSync(saved.content[1].path), png);
 });
 
 test('discard removes reply file and exported image while keeping a readable log tombstone', (t) => {
   const { service } = fixture(t), request = service.create({ title: 'discard cache', plugins: [] });
   service.addImage(request.id, { name: 'private.png', mime: 'image/png', bytes: png });
   service.complete(request.id, { version: 1, reply: 'remove this' });
-  const before = service.logs().entries[0], imagePath = json(before.cache.replyPath).images[0].path;
+  const before = service.logs().entries[0], imagePath = json(before.cache.replyPath).content[1].path;
   service.discardReply(request.id, service.get(request.id).version);
   const after = service.logs().entries[0];
   assert.equal(after.cache.state, 'discarded'); assert.equal(after.cache.replyPath, null);

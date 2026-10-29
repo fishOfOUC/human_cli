@@ -34,7 +34,7 @@ export class WindowManager {
     });
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     win.webContents.on('will-navigate', (event) => event.preventDefault());
-    win.on('close', (event) => { if (!this.quitting) { event.preventDefault(); win.minimize(); } });
+    win.on('close', (event) => { if (!this.quitting) { event.preventDefault(); win.webContents.send('human-cli:close-request'); } });
     win.on('closed', () => { clearTimeout(saveTimer); this.windows.delete(key); });
     let saveTimer;
     const persistGeometry = () => {
@@ -52,15 +52,19 @@ export class WindowManager {
     win.on('move', saveGeometry); win.on('resize', saveGeometry);
     return win;
   }
-  beginResize(win, edge) {
+  beginResize(win, edge, replyHeight) {
     if (!resizeEdges.includes(edge) || win.isMinimized() || win.isMaximized()) throw new Error('当前无法调整窗口大小。');
     const bounds = win.getBounds();
-    win.resizeSession = { edge, bounds, pointer: screen.getCursorScreenPoint(), area: screen.getDisplayMatching(bounds).workArea };
+    if (replyHeight !== undefined && (edge !== 's' || !Number.isFinite(replyHeight) || replyHeight < 44)) throw new Error('无效的回复框高度。');
+    win.resizeSession = { edge, bounds, pointer: screen.getCursorScreenPoint(), area: screen.getDisplayMatching(bounds).workArea,
+      minHeight: replyHeight === undefined ? 300 : Math.max(300, bounds.height - replyHeight + 44) };
+    return bounds;
   }
   resize(win) {
     const drag = win.resizeSession; if (!drag) return;
     const point = screen.getCursorScreenPoint(), { bounds, edge, area } = drag;
     const target = resizeFromEdge(bounds, edge, point.x - drag.pointer.x, point.y - drag.pointer.y, {
+      minHeight: drag.minHeight,
       maxWidth: Math.min(1600, edge.includes('w') ? bounds.x + bounds.width - area.x : area.x + area.width - bounds.x),
       maxHeight: Math.min(1200, edge.includes('n') ? bounds.y + bounds.height - area.y : area.y + area.height - bounds.y),
     });
@@ -76,6 +80,7 @@ export class WindowManager {
     if ((edge.includes('w') && actual.width !== target.width) || (edge.includes('n') && actual.height !== target.height)) {
       win.setPosition(edge.includes('w') ? bounds.x + bounds.width - actual.width : actual.x, edge.includes('n') ? bounds.y + bounds.height - actual.height : actual.y);
     }
+    return win.getBounds();
   }
   endResize(win) {
     if (!win.resizeSession) return;

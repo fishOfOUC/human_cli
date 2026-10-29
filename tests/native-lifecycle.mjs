@@ -8,7 +8,7 @@ import { stableBounds } from '../desktop/geometry.mjs';
 
 const output = resolve('.qa', `lifecycle-${randomUUID().slice(0, 8)}`), data = join(output, 'data');
 mkdirSync(output, { recursive: true });
-const env = { ...process.env, HUMAN_CLI_DATA_DIR: data, HUMAN_CLI_NO_AUTOSTART: '1' }; delete env.ELECTRON_RUN_AS_NODE;
+const env = { ...process.env, HUMAN_CLI_DATA_DIR: data, HUMAN_CLI_CACHE_DIR: join(output, 'cache'), HUMAN_CLI_NO_AUTOSTART: '1' }; delete env.ELECTRON_RUN_AS_NODE;
 const checks = [], check = (name, result) => { assert.ok(result, name); checks.push(name); console.log(`PASS ${name}`); };
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 async function until(fn) { for (let i = 0; i < 200; i++) { const value = await fn(); if (value) return value; await sleep(40); } throw new Error('Native lifecycle check timed out'); }
@@ -64,18 +64,18 @@ try {
   await current.command('complete', first.id);
   const result = await cli.done; assert.equal(result.code, 0, result.stderr);
   const completed = JSON.parse(result.stdout);
-  check('The same CLI receives the full persisted completion', completed.result.reply === '已验收，便签可以消失了' && existsSync(completed.cache.replyPath));
+  check('The same CLI receives the compact persisted completion', completed.content[0].text === '已验收，便签可以消失了' && completed.requestId === first.id);
   await until(async () => (await current.command('windows')).length === 1);
   check('Completed note is destroyed while another pending note stays', (await current.command('windows'))[0].requestId === second.id);
-  await api(`/requests/${second.id}/cancel`, 'POST', { reason: '并行任务结束' });
+  await current.command('close', second.id);
   const exited = await current.closed; assert.equal(exited.code, 0, exited.stderr);
-  check('Last cancellation drains its reply, removes all windows and exits the actual process', !existsSync(join(data, 'runtime.json')) && current.events.find((e) => e.event === 'exiting')?.windows.length === 0);
+  check('Last user close removes all windows and exits the actual process', !existsSync(join(data, 'runtime.json')) && current.events.find((e) => e.event === 'exiting')?.windows.length === 0 && JSON.parse(readFileSync(join(data, 'state.json'))).requests[second.id].cancelledBy === 'user');
   check('Immediate completion flushes a recent resize; ending an unchanged companion does not overwrite it', JSON.parse(readFileSync(join(data, 'state.json'), 'utf8')).geometry.bounds.width === stableBounds(resized.bounds, resized.scaleFactor).width);
 
   current = launch(); await until(() => current.ready);
   check('Restart with only completed history creates no windows', current.ready.windows.length === 0);
   const logs = await command(['logs']).done;
-  check('AI recovers cached reply through logs without a user interface', logs.code === 0 && JSON.parse(readFileSync(JSON.parse(logs.stdout).entries.find((r) => r.id === first.id).cache.replyPath, 'utf8')).reply.includes('已验收'));
+  check('AI recovers cached reply through logs without a user interface', logs.code === 0 && JSON.parse(readFileSync(JSON.parse(logs.stdout).entries.find((r) => r.id === first.id).cache.replyPath, 'utf8')).content[0].text.includes('已验收'));
   await current.closed;
   check('Read-only recovery process also exits automatically', !existsSync(join(data, 'runtime.json')));
   writeFileSync(join(output, 'report.json'), JSON.stringify({ passed: checks.length, checks }, null, 2));

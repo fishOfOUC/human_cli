@@ -10,6 +10,7 @@ import { png } from './helpers.mjs';
 
 const output = resolve('.qa', `rebuild-${randomUUID().slice(0, 8)}`);
 process.env.HUMAN_CLI_DATA_DIR = join(output, 'data');
+process.env.HUMAN_CLI_CACHE_DIR = join(output, 'cache');
 process.env.HUMAN_CLI_TEST_HIDDEN = '1';
 mkdirSync(join(process.env.HUMAN_CLI_DATA_DIR, 'plugins'), { recursive: true });
 const provider = await startAcceptanceProvider();
@@ -39,6 +40,37 @@ async function run() {
     win.webContents.on('render-process-gone', (_event, info) => errors.push(info.reason));
     check('Original compact native window size is retained', Math.abs(win.getBounds().width - 380) <= 2 && Math.abs(win.getBounds().height - 360) <= 2);
     check('Only the reply action remains; waiting status replaces the secondary completion button', await js('document.querySelector(".note-footer .waiting-label").textContent==="等待你的反馈" && document.querySelectorAll(".note-footer button").length===1 && !document.querySelector("[data-action=only],.request-meta,.bottom-status,.resize-handle") && document.querySelectorAll("[data-resize-edge]").length===8'));
+    check('Reply area is a full-size input with no labels, upload controls or resize grip', await js('(()=>{const t=document.querySelector("#reply"),c=document.querySelector(".composer");return !c.querySelector("label,button,.draft-state,.compose-hint") && !document.querySelector("#image-input") && getComputedStyle(t).resize==="none" && t.getBoundingClientRect().height>=50 && t.getBoundingClientRect().height<=70 && t.placeholder.includes("粘贴图片") && t.getBoundingClientRect().height/c.getBoundingClientRect().height>.9})()'));
+    check('Upper titlebar drags the window while buttons stay clickable', await js('getComputedStyle(document.querySelector(".window-titlebar")).getPropertyValue("-webkit-app-region")==="drag" && getComputedStyle(document.querySelector(".pin-control")).getPropertyValue("-webkit-app-region")==="no-drag" && document.querySelector(".window-titlebar").getBoundingClientRect().height>=35'));
+    const replyRect = () => js('document.querySelector(".composer").getBoundingClientRect().toJSON()');
+    const dragReplyEdge = async (edge, dy) => {
+      const rect = await js(`(()=>{const r=document.querySelector('[data-reply-resize=${edge}]').getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}})()`);
+      const before = await replyRect(), bounds = win.getBounds(), cursor = screen.getCursorScreenPoint;
+      let point = { x: bounds.x+rect.x, y: bounds.y+rect.y };
+      if (edge === 'bottom') screen.getCursorScreenPoint = () => point;
+      try {
+        win.webContents.focus();
+        win.webContents.sendInputEvent({type:'mouseMove',...rect});
+        win.webContents.sendInputEvent({type:'mouseDown',...rect,button:'left',clickCount:1});
+        if (edge === 'bottom') await until(() => Boolean(win.resizeSession));
+        point = {x:point.x,y:point.y+dy};
+        win.webContents.sendInputEvent({type:'mouseMove',x:rect.x,y:rect.y+dy,modifiers:['leftButtonDown']});
+        await until(async () => (await replyRect()).height !== before.height);
+        win.webContents.sendInputEvent({type:'mouseUp',x:rect.x,y:rect.y+dy,button:'left',clickCount:1});
+        if (edge === 'bottom') await until(() => !win.resizeSession);
+        await sleep(40);
+        return {rect:await replyRect(),bounds:win.getBounds()};
+      } finally { screen.getCursorScreenPoint = cursor; }
+    };
+    const initialBounds = win.getBounds();
+    const grownTop = await dragReplyEdge('top', -22);
+    check('Upper reply border changes input height while the window stays fixed', Math.abs(grownTop.rect.height-86)<=1 && grownTop.bounds.height===initialBounds.height);
+    const beforeBottom = await replyRect();
+    const grownBottom = await dragReplyEdge('bottom', 20);
+    check('Lower reply border grows the window downward and keeps the input top anchored', Math.abs(grownBottom.rect.height-106)<=1 && Math.abs(grownBottom.rect.top-beforeBottom.top)<=1 && Math.abs(grownBottom.rect.bottom-beforeBottom.bottom-20)<=1 && Math.abs(grownBottom.bounds.height-initialBounds.height-20)<=1 && grownBottom.bounds.y===initialBounds.y);
+    const shrunkBottom = await dragReplyEdge('bottom', -20);
+    check('Lower reply border shrinks the window and input together without moving the top', Math.abs(shrunkBottom.rect.top-beforeBottom.top)<=1 && Math.abs(shrunkBottom.bounds.height-initialBounds.height)<=1);
+    await dragReplyEdge('top', 22);
     const empty = await api('/requests', 'POST', { title: '空回复直接完成', plugins: [] });
     const imageOnly = await api('/requests', 'POST', { title: '只附图片也能完成', plugins: [] });
     check('AI content replaces prototype fixture data', await js('document.querySelector(".description").textContent === "逐项确认，然后把结果留在这里。" && document.querySelectorAll("[data-step]").length === 3'));
@@ -46,8 +78,8 @@ async function run() {
     await until(async () => (await api(`/requests/${request.id}`)).checks.includes(0));
     check('Progress bar and animated checkbox reflect durable request checks', await js('document.querySelector("#progress-copy").textContent.startsWith("1 / 3") && document.querySelector("[role=progressbar]").getAttribute("aria-valuenow")==="1" && document.querySelector(".check-row").classList.contains("done")'));
     await js('document.querySelector("#reply").value="重构界面的真实回复";document.querySelector("#reply").dispatchEvent(new Event("input",{bubbles:true}))');
-    await until(() => js('document.querySelector("#draft-state").textContent==="草稿已保存"'));
-    check('Draft saved label is backed by persisted host data', (await api(`/requests/${request.id}`)).reply === '重构界面的真实回复');
+    await until(async () => (await api(`/requests/${request.id}`)).reply === '重构界面的真实回复');
+    check('Draft persists automatically without consuming input area for a saved label', !await js('Boolean(document.querySelector("#draft-state"))'));
     await js('document.querySelector("#tool-plain").click()');
     await until(async () => (await api(`/requests/${request.id}`)).tools[2].state === 'success');
     check('Left-side plugin executes without navigation or lost reply', await js('document.querySelector("#shared-panel").dataset.pane==="note" && document.querySelector("#reply").value==="重构界面的真实回复" && document.querySelector(".bookmark-rail.left #tool-plain").classList.contains("success")'));
@@ -110,7 +142,7 @@ async function run() {
     await until(() => !emptyWin.webContents.isLoading() && emptyWin.webContents.executeJavaScript('Boolean(document.querySelector("#reply"))'));
     await emptyWin.webContents.executeJavaScript('document.querySelector("[data-action=complete]").click()', true);
     await until(() => emptyWin.isDestroyed());
-    check('One reply button completes an empty reply without a confirmation page', (await api(`/requests/${empty.id}`)).result.reply === '已完成');
+    check('One reply button completes an empty reply without synthesizing text', (await api(`/requests/${empty.id}`)).result.reply === '');
     const imageWin = BrowserWindow.getAllWindows().find((w) => w.requestId === imageOnly.id);
     await until(() => !imageWin.webContents.isLoading() && imageWin.webContents.executeJavaScript('Boolean(document.querySelector("#reply"))'));
     await imageWin.webContents.executeJavaScript(`window.humanCli.addImage({name:'只有图片.png',mime:'image/png',bytes:new Uint8Array(${JSON.stringify([...png])})})`, true);
@@ -129,5 +161,5 @@ async function run() {
     app.quit();
   }
 }
-function existsReply(request) { return JSON.parse(readFileSync(request.cache.replyPath, 'utf8')).reply === request.result.reply; }
+function existsReply(request) { return JSON.parse(readFileSync(request.cache.replyPath, 'utf8')).content[0].text === request.result.reply; }
 void run();
