@@ -4,8 +4,13 @@ import { fail, errorData } from '../core/errors.mjs';
 
 export function registerIpc(service, windows, configUis) {
   const state = (win) => ({ request: service.snapshot(win.requestId), preferences: service.store.data.preferences, configUi: configUis?.snapshot(win) || null });
-  const broadcast = () => {
-    for (const win of windows.windows.values()) if (!win.isDestroyed() && service.get(win.requestId).status === 'pending') { win.setAlwaysOnTop(service.store.data.preferences.pinned); win.webContents.send('human-cli:state', state(win)); }
+  const broadcast = ({ id } = {}) => {
+    for (const win of windows.windows.values()) {
+      if (win.isDestroyed() || (id && win.requestId !== id) || service.get(win.requestId).status !== 'pending') continue;
+      const pinned = service.store.data.preferences.pinned;
+      if (win.isAlwaysOnTop() !== pinned) win.setAlwaysOnTop(pinned);
+      win.webContents.send('human-cli:state', state(win));
+    }
   };
   service.on('change', broadcast); service.on('preferences', broadcast); service.on('connection', broadcast);
   configUis?.on('change', (win) => { if (win && !win.isDestroyed()) win.webContents.send('human-cli:state', state(win)); });

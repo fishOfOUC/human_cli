@@ -18,6 +18,7 @@
     "test:lifecycle": "node tests/native-lifecycle.mjs",
     "test:rebuild": "electron tests/native-rebuild.mjs",
     "test:reply": "electron tests/native-ordered-reply.mjs",
+    "test:input": "electron tests/native-input.mjs",
     "setup": "node node_modules/electron/install.js",
     "postinstall": "npm run setup"
   },

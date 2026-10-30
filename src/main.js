@@ -2,6 +2,7 @@ import { $, esc, icon, refreshIcons } from './ui.js';
 import { railHTML, panelHTML, progressHTML } from './views.js';
 import { applyTheme } from './themes.js';
 import { ReplyEditor } from './reply-editor.js';
+import { renderNoteBody } from './note-renderer.js';
 import './style.css';
 import './desktop.css';
 
@@ -25,9 +26,9 @@ async function call(method, ...args) {
   if (!response.ok) throw Object.assign(new Error(response.error.message), response.error);
   return response.value;
 }
-let deferredState;
+let deferredState, composing, pendingRender = false;
 function receive(next) {
-  if (replyResize) { deferredState = next; return; }
+  if (replyResize || composing) { deferredState = next; return; }
   const request = next.request;
   if (request?.id !== local.requestId) {
     editor.receive(request?.content, true);
@@ -42,27 +43,32 @@ function receive(next) {
 }
 function render() {
   if (!state) return;
+  if (composing) { pendingRender = true; return; }
+  pendingRender = false;
   applyTheme(state.preferences.theme);
   document.documentElement.classList.toggle('motion-off', state.preferences.motion === false);
   const focused = document.activeElement, focusId = focused?.id, hadFocus = document.hasFocus();
   const selection = typeof focused?.selectionStart === 'number' ? [focused.selectionStart, focused.selectionEnd] : null;
   const oldPane = $('#shared-panel')?.dataset.pane, scroll = $('.pane-scroll')?.scrollTop || 0;
   const request = state.request ? { ...state.request, content: editor.blocks, checks: local.checks } : null;
-  $('.note-body').innerHTML = `${railHTML(request, 'left', local.pane)}<article class="paper" id="shared-panel" role="region" aria-label="便签与工具详情" data-pane="${esc(local.pane)}">${panelHTML({ ...state, request }, local)}</article>${railHTML(request, 'right', local.pane)}`;
+  renderNoteBody($('.note-body'), `${railHTML(request, 'left', local.pane)}<article class="paper" id="shared-panel" role="region" aria-label="便签与工具详情" data-pane="${esc(local.pane)}">${panelHTML({ ...state, request }, local)}</article>${railHTML(request, 'right', local.pane)}`, request?.id, local.pane);
   $('#agent-name').textContent = request?.agent || 'human_cli';
   $('.pin-control').innerHTML = icon(state.preferences.pinned ? 'pin' : 'pin-off');
   $('.pin-control').setAttribute('aria-pressed', String(state.preferences.pinned));
   refreshIcons();
   for (const input of document.querySelectorAll('.reply-blocks:not(.single) textarea')) { input.style.height = 'auto'; input.style.height = `${Math.max(36, input.scrollHeight)}px`; }
   if (oldPane === local.pane) {
-    const replacement = focusId && document.getElementById(focusId);
-    if (hadFocus) replacement?.focus({ preventScroll: true });
-    if (replacement && selection && replacement.setSelectionRange) replacement.setSelectionRange(...selection);
+    const replacement = focused?.isConnected ? focused : focusId && document.getElementById(focusId);
+    if (replacement && document.activeElement !== replacement) {
+      if (hadFocus) replacement.focus({ preventScroll: true });
+      if (selection && replacement.setSelectionRange) replacement.setSelectionRange(...selection);
+    }
     if ($('.pane-scroll')) $('.pane-scroll').scrollTop = scroll;
   }
   requestAnimationFrame(syncConfigBounds);
 }
 function pane(id) {
+  if (id === local.pane) return;
   if (id !== local.pane && state?.configUi) execute(() => call('closeConfigUi'));
   local.pane = id; render();
 }
@@ -91,7 +97,7 @@ async function openToolPanel(id) {
 }
 function saveDraft() {
   clearTimeout(draftTimer);
-  if (closing || !state.request || state.request.status !== 'pending') return draftChain;
+  if (closing || composing || !state.request || state.request.status !== 'pending') return draftChain;
   if (!editor.ready) return draftChain;
   const payload = { content: editor.serialize(), checks: [...local.checks] };
   draftChain = draftChain.catch(() => {}).then(() => call('draft', payload));
@@ -100,11 +106,11 @@ function saveDraft() {
 }
 function scheduleDraft() {
   clearTimeout(draftTimer);
-  if (closing) return;
+  if (closing || composing) return;
   draftTimer = setTimeout(() => { saveDraft().catch(() => { draftChain = Promise.resolve(); }); }, 200);
 }
 async function finish() {
-  if (closing || completing || state.request?.status !== 'pending') return;
+  if (closing || completing || composing || state.request?.status !== 'pending') return;
   const version = state.request.version;
   const sequence = ++completionSequence;
   completing = true;
@@ -176,6 +182,21 @@ function configDraft(form) {
   }
   return config;
 }
+document.addEventListener('compositionstart', (event) => {
+  composing = event.target; clearTimeout(draftTimer);
+});
+document.addEventListener('compositionend', (event) => {
+  if (composing !== event.target) return;
+  composing = null;
+  if (event.target.matches('[data-text-block]')) editor.input(event.target);
+  // Let any final input event update the model before replaying external state.
+  queueMicrotask(() => {
+    if (composing) return;
+    if (deferredState) { const next = deferredState; deferredState = null; receive(next); }
+    else if (pendingRender) renderEditor();
+    scheduleDraft();
+  });
+});
 document.addEventListener('input', (event) => {
   if (event.target.matches('[data-text-block]')) { editor.input(event.target); if (!$('.reply-blocks').classList.contains('single')) { event.target.style.height = 'auto'; event.target.style.height = `${Math.max(36, event.target.scrollHeight)}px`; } }
   const form = event.target.closest('.tool-settings-form');
@@ -205,7 +226,7 @@ document.addEventListener('submit', (event) => {
   execute(async () => { const id = form.dataset.id; await call('configureTool', id, configDraft(form)); delete local.configDrafts[id]; toast('工具设置已保存'); });
 });
 document.addEventListener('keydown', (event) => {
-  if (!state) return;
+  if (!state || composing || event.isComposing || event.keyCode === 229) return;
   const button = event.target.closest('.bookmark[data-tool]');
   if (button && (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) { event.preventDefault(); execute(() => openToolPanel(button.dataset.tool)); return; }
   if (button && ['Enter', ' '].includes(event.key) && !event.ctrlKey && !event.metaKey) { event.preventDefault(); if (!event.repeat) execute(() => actions.run(button)); return; }
