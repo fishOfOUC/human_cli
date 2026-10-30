@@ -64,7 +64,7 @@ Windows x64 便携包使用真实 MCP 客户端调用包内适配器，自动启
 
 ## 新界面迁移（本地）
 
-迁移来源为用户提供的 archive/prototype/rebuild/sticky-note.html，按用户选择保留原来的小便签尺寸。实现与验证入口见 [UI-REBUILD.md](UI-REBUILD.md)。测试与截图均使用独立 .qa 数据目录，原稿及测试服务不随产品打包。
+迁移来源为用户提供的 archive/prototype/rebuild/sticky-note.html，按用户选择保留原来的小便签尺寸。测试与截图均使用独立 .qa 数据目录，原稿及测试服务不随产品打包。
 
 本次验证结果：68 项核心测试；25 项原生流程（`.qa/native-1ce873e3/report.json`）；25 项网页配置（`.qa/config-ui-3bee2f36/report.json`）；12 项生命周期（`.qa/lifecycle-7a6fb298/report.json`）；16 项迁移界面检查（`.qa/rebuild-c801a9b3/report.json`）；20 项打包 CLI/MCP（`.qa/cli-中文 空格-4OH0we/acceptance.json`）。四主题及扩大尺寸截图已检查，默认小尺寸与最小尺寸控制区均通过测量。
 
@@ -90,7 +90,7 @@ Windows x64 便携包使用真实 MCP 客户端调用包内适配器，自动启
 - 发布包 EXE/MCP 通过 21 项检查：`.qa/cli-中文 空格-Vd4jD2/acceptance.json`。受测子进程 PATH 为空，验证不依赖系统 Node、中文及空格路径、UTF-8 标准输入、同次等待、取消、按需启动/退出、MCP 以及默认缓存确实位于发布软件目录。打包排除源码根缓存与测试目录，便携 ZIP 也排除根目录验收缓存。
 - 延用现有便签样式与主题令牌，新增有序编辑区的源样式检查通过（0 FAIL、0 WARN）。实际原生窗口截图与最小尺寸检查作为桌面 UI 验收依据。
 
-软件目录搬迁、旧记录和存储故障恢复通过隔离目录/注入故障验证；不宣称实际拔插硬件或真实磁盘耗尽。输入框偶发丢字仍为独立已知问题，本次未单独排查或声称修复。
+软件目录搬迁、旧记录和存储故障恢复通过隔离目录/注入故障验证；不宣称实际拔插硬件或真实磁盘耗尽。
 
 ## v2.0.1 MCP strict 声明兼容（2026-10-29）
 
@@ -107,7 +107,7 @@ Windows x64 便携包使用真实 MCP 客户端调用包内适配器，自动启
 - 91 项自动化测试通过，日志 `.qa/confirmation-tests-final.log`。覆盖空文本/空白/only 完成标记、缓存及重启保留标记、human_get 可见性，有文字/图片/空文件时不误判为空，以及 pending/cancelled/discarded 不误标确认。
 - 实际 MCP 调用传入 agent=""、idempotencyKey=""、format="" 后成功创建并在同次调用收到空提交说明。两次空幂等键调用生成不同请求与真实幂等键，不使用共享占位常量。必填标题、插件标识、有效幂等键以及插件内部空串保持原规则。
 - 12 项真实窗口检查通过：`.qa/ordered-reply-ab14c0bd/report.json`。新增不输入内容直接点击完成，确认 AI 实际收到 confirmation_only，完整查询与持久完成结果也包含同一说明；有序图片/文件交付继续通过。
-- 本机 CodeBuddy 转换器 48 次声明转换全部通过，报告 `.qa/confirmation-codebuddy-schema.json`；本次不将空提交归因为输入丢失，也未修改独立的已知丢字问题。
+- 本机 CodeBuddy 转换器 48 次声明转换全部通过，报告 `.qa/confirmation-codebuddy-schema.json`。
 - 发布包 22 项 EXE/MCP 检查通过：`.qa/cli-中文 空格-XgO6Ao/acceptance.json`；包内声明另经 48 次 CodeBuddy 转换，报告 `.qa/confirmation-codebuddy-packaged.json`。35 个运行模块与源码逐字节一致，文档 JSON 示例解析通过。已确认打包排除本地 .mcp.json，便携 ZIP 同时排除根目录验收缓存。
 
 ## v2.0.3 用户关闭控件（2026-10-29）
@@ -118,6 +118,12 @@ Windows x64 便携包使用真实 MCP 客户端调用包内适配器，自动启
 - 25 项插件配置页检查：`.qa/config-ui-f3557017/report.json`，包括通过新关闭按钮取消任务并释放配置页会话。界面源码风格检查为 0 FAIL、0 WARN。
 - 33 项便签界面回归：`.qa/rebuild-9d6264b9/report.json`，覆盖四主题、最小尺寸、窗口与回复框边缘缩放及完成流程。
 - v2.0.3 便携包 EXE/MCP 通过 22 项检查：`.qa/cli-中文 空格-qjIm3V/acceptance.json`。35 个运行模块及 4 个前端产物与工作区逐字节一致，包内排除本地 MCP 配置及测试目录，便携 ZIP 排除根目录验收缓存。
+
+## 编辑器组合输入回归（2026-10-30）
+
+`npm run test:input` 通过 18 项检查，报告 `.qa/input-1793321169396/report.json`。在独立数据和缓存目录中启动隐藏的 Electron 窗口，通过 Chromium 原生组合输入接口验证自动保存、光标选区、拼音停顿后继续输入、组合提交/取消、快捷键、外部任务与主题更新、便签间通知隔离、附件异步完成及多段回复。测试不发送系统全局鼠标或按键，不等同于特定第三方输入法的逐项实机验收。
+
+同轮核心测试 93 项、有序回复 17 项、界面与缩放 33 项、插件配置界面 25 项均通过；构建和打包成功。
 
 ## 目录整理与提交前回归（2026-10-30）
 

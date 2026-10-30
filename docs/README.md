@@ -13,6 +13,3 @@
 | 插件托管网页配置界面 | [配置界面接入](CONFIG-UI.md) |
 | 版本变化 | [发布说明](RELEASE-NOTES.md) |
 | 已完成验证及其适用范围 | [验证说明](VERIFICATION.md) |
-| 暂存的问题与处理约定 | [已知问题](KNOWN-ISSUES.md) |
-
-设计与改造记录：[界面迁移](UI-REBUILD.md)、[AI 回复改造](AI-RESPONSE-REFACTOR.md)。实际完成情况以发布说明和验证记录为准。
