@@ -19,6 +19,7 @@
     "test:rebuild": "electron tests/native-rebuild.mjs",
     "test:reply": "electron tests/native-ordered-reply.mjs",
     "test:input": "electron tests/native-input.mjs",
+    "test:pin": "electron tests/native-pin.mjs",
     "setup": "node node_modules/electron/install.js",
     "postinstall": "npm run setup"
   },

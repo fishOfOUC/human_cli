@@ -4,6 +4,12 @@ import { restoreBounds, stableBounds, resizeEdges, resizeFromEdge } from './geom
 
 export class WindowManager {
   constructor(root, store) { this.root = root; this.store = store; this.windows = new Map(); this.quitting = false; this.captureActive = false; }
+  syncPinned(win, force = false) {
+    if (win.isDestroyed()) return;
+    const pinned = this.store.data.preferences.pinned;
+    if (force || win.isAlwaysOnTop() !== pinned) win.setAlwaysOnTop(pinned);
+    if (force && pinned && win.isVisible() && !win.isMinimized()) win.moveTop();
+  }
   open(requestId) {
     if (!requestId || this.store.data.requests[requestId]?.status !== 'pending') return null;
     const key = requestId;
@@ -31,7 +37,12 @@ export class WindowManager {
         win.setBounds(requested);
       }
       restoring = false;
+      this.syncPinned(win, true);
     });
+    // Reapply after native show/restore processing: the saved preference alone
+    // does not guarantee that a restored Windows window keeps its topmost band.
+    for (const event of ['show', 'restore']) win.on(event, () => setImmediate(() => this.syncPinned(win, true)));
+    win.on('blur', () => this.syncPinned(win));
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     win.webContents.on('will-navigate', (event) => event.preventDefault());
     win.on('close', (event) => { if (!this.quitting) { event.preventDefault(); win.webContents.send('human-cli:close-request'); } });

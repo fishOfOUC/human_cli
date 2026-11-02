@@ -7,8 +7,7 @@ export function registerIpc(service, windows, configUis) {
   const broadcast = ({ id } = {}) => {
     for (const win of windows.windows.values()) {
       if (win.isDestroyed() || (id && win.requestId !== id) || service.get(win.requestId).status !== 'pending') continue;
-      const pinned = service.store.data.preferences.pinned;
-      if (win.isAlwaysOnTop() !== pinned) win.setAlwaysOnTop(pinned);
+      windows.syncPinned(win);
       win.webContents.send('human-cli:state', state(win));
     }
   };
