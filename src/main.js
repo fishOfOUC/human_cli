@@ -7,7 +7,7 @@ import './style.css';
 import './desktop.css';
 
 const bridge = window.humanCli;
-const local = { pane: 'note', reply: '', checks: [], requestId: null, version: null, configDrafts: {}, openSettings: new Set(), toolTabs: {}, replyHeight: 64, attachmentCount: 0 };
+const local = { pane: 'note', reply: '', checks: [], requestId: null, version: null, configDrafts: {}, openSettings: new Set(), toolTabs: {}, replyHeight: 64, attachmentCount: 0, history: null, historyDetail: {} };
 let state, draftTimer, toastTimer, draftChain = Promise.resolve(), completing = false, closing = false, completionSequence = 0;
 const editor = new ReplyEditor({ upload: (data) => call('uploadAttachment', data), changed: scheduleDraft, render: renderEditor });
 function renderEditor() {
@@ -136,8 +136,27 @@ async function addFiles(files) {
   if (state.request?.status !== 'pending') { toast('当前没有等待协助的请求'); return; }
   editor.addFiles(files);
 }
+function openHistoryPane(id) {
+  if (id === 'history') void fetchHistoryList();
+  else if (id.startsWith('history:') && !local.historyDetail[id.slice('history:'.length)]) void fetchHistorySnapshot(id.slice('history:'.length));
+  pane(id);
+}
+async function fetchHistoryList() {
+  try {
+    const response = await bridge.history();
+    if (response.ok) local.history = response.value; else toast(response.error.message);
+  } catch (error) { toast(error.message); }
+  if (local.pane === 'history' || local.pane.startsWith('history:')) render();
+}
+async function fetchHistorySnapshot(historyId) {
+  try {
+    const response = await bridge.historyDetail(historyId);
+    if (response.ok) local.historyDetail[historyId] = response.value; else toast(response.error.message);
+  } catch (error) { toast(error.message); }
+  if (local.pane === `history:${historyId}`) render();
+}
 const actions = {
-  pane: (button) => pane(button.dataset.pane),
+  pane: (button) => openHistoryPane(button.dataset.pane),
   hide: () => call('hide'), pin: () => call('preferences', { pinned: !state.preferences.pinned }),
   close: () => closeRequest(),
   theme: (button) => call('preferences', { theme: button.dataset.theme }),

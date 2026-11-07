@@ -2,14 +2,14 @@ import {
   createIcons, NotebookPen, Plus, ChevronRight, StickyNote, Pin, Minus, X,
   Grip, RotateCcw, Info, ExternalLink, Copy, ScanLine, Terminal, RotateCw,
   LoaderCircle, CircleAlert, Check, CornerDownLeft, ImagePlus, Bot,
-  FileWarning, Sun, Moon, Download, PinOff, ArrowLeft, ArrowUp, ArrowDown, File, Puzzle, FileText, Settings, Send,
+  FileWarning, Sun, Moon, Download, PinOff, ArrowLeft, ArrowUp, ArrowDown, File, Puzzle, FileText, Settings, Send, History,
 } from 'lucide';
 
 const icons = {
   NotebookPen, Plus, ChevronRight, StickyNote, Pin, Minus, X, Grip,
   RotateCcw, Info, ExternalLink, Copy, ScanLine, Terminal, RotateCw,
   LoaderCircle, CircleAlert, Check, CornerDownLeft, ImagePlus, Bot,
-  FileWarning, Sun, Moon, Download, PinOff, ArrowLeft, ArrowUp, ArrowDown, File, Puzzle, FileText, Settings, Send,
+  FileWarning, Sun, Moon, Download, PinOff, ArrowLeft, ArrowUp, ArrowDown, File, Puzzle, FileText, Settings, Send, History,
 };
 
 export const $ = (selector, root = document) => root.querySelector(selector);
@@ -21,5 +21,5 @@ export const icon = (name, cls = '') => {
   return `<i data-lucide="${icons[key] ? esc(name) : 'puzzle'}" class="${esc(cls)}" aria-hidden="true"></i>`;
 };
 export const refreshIcons = () => createIcons({ icons, attrs: { 'aria-hidden': 'true' } });
-export const states = { idle: '待运行', running: '运行中', success: '已完成', error: '出错' };
+export const states = { idle: '待运行', running: '运行中', success: '已完成', error: '出错', pending: '等待中', completed: '已完成', cancelled: '已取消' };
 export const stateBadge = (state) => `<span class="state ${state}"><span class="state-dot"></span>${states[state]}</span>`;

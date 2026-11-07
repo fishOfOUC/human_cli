@@ -61,11 +61,42 @@ function toolPanel(request, tool, local, configUi) {
 }
 function settings(state) {
   const toggle = (title, text, action, checked) => `<div class="settings-row"><div><strong>${title}</strong><p>${text}</p></div><button class="switch" role="switch" aria-checked="${checked}" aria-label="${title}" data-action="${action}"></button></div>`;
-  return `${header('便签设置')}<div class="pane-scroll settings-content"><h2>便签主题</h2><div class="theme-picker">${themes.map((theme) => `<button class="theme-swatch ${state.preferences.theme === theme.id ? 'selected' : ''}" data-action="theme" data-theme="${theme.id}" aria-pressed="${state.preferences.theme === theme.id}"><span style="background:${theme.color}"></span>${theme.name}</button>`).join('')}</div><p class="tool-hint">应用到所有便签，并记住下次使用的选择。</p>${toggle('控件动效', '勾选反馈与按钮响应', 'motion', state.preferences.motion !== false)}${toggle('窗口置顶', '让当前任务保持在其他窗口上方', 'pin', state.preferences.pinned)}</div><footer class="pane-footer">${back()}</footer>`;
+  return `${header('便签设置')}<div class="pane-scroll settings-content"><h2>便签主题</h2><div class="theme-picker">${themes.map((theme) => `<button class="theme-swatch ${state.preferences.theme === theme.id ? 'selected' : ''}" data-action="theme" data-theme="${theme.id}" aria-pressed="${state.preferences.theme === theme.id}"><span style="background:${theme.color}"></span>${theme.name}</button>`).join('')}</div><p class="tool-hint">应用到所有便签，并记住下次使用的选择。</p>${toggle('控件动效', '勾选反馈与按钮响应', 'motion', state.preferences.motion !== false)}${toggle('窗口置顶', '让当前任务保持在其他窗口上方', 'pin', state.preferences.pinned)}<div class="settings-row"><div><strong>请求历史</strong></div><button class="secondary" data-action="pane" data-pane="history">${icon('history')}查看</button></div></div><footer class="pane-footer">${back()}</footer>`;
+}
+const formatTime = (value) => value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '—';
+const settingsBack = `<button class="icon-button" data-action="pane" data-pane="settings" aria-label="返回设置">${icon('arrow-left')}</button>`;
+const historyBack = `<button class="icon-button" data-action="pane" data-pane="history" aria-label="返回历史">${icon('arrow-left')}</button>`;
+const historyReturn = `<button type="button" class="text-button" data-action="pane" data-pane="history">返回历史</button>`;
+function historyList(state, local) {
+  const rows = (local.history || []).map((r) => `<button class="history-row" data-action="pane" data-pane="history:${esc(r.id)}"><span class="history-row-main"><strong>${esc(r.title)}</strong><small>${esc(r.agent)} · ${formatTime(r.updatedAt)}</small></span>${stateBadge(r.status)}</button>`).join('');
+  const body = local.history ? (rows || '<p class="tool-hint">还没有任何请求记录。</p>') : '<p class="tool-hint">正在加载…</p>';
+  return `<div class="pane-heading">${settingsBack}<h1>历史记录</h1></div><div class="pane-scroll history-content">${body}</div><footer class="pane-footer"><button type="button" class="text-button" data-action="pane" data-pane="settings">返回设置</button></footer>`;
+}
+function historyReplyHTML(content, submission) {
+  const blocks = (content || []).map((b) => {
+    if (b.type === 'text') return `<p class="history-text">${esc(b.text)}</p>`;
+    if (b.type === 'diagnostic') return `<div class="error-attachment" title="${esc(b.message)}"><span>${icon('file-warning')}${esc(b.name)} · 诊断</span></div>`;
+    const a = b.attachment;
+    if (b.type === 'image' && a) return `<div class="reply-attachment image-attachment">${image(a)}<span class="attachment-name">${esc(a.name)}<small>${Math.ceil((a.size || 0) / 1024)} KiB</small></span></div>`;
+    return `<div class="reply-attachment file-attachment"><span>${icon('file')}</span><span class="attachment-name">${esc(a?.name || b.name)}<small>${a ? `${Math.ceil((a.size || 0) / 1024)} KiB` : ''}</small></span></div>`;
+  }).join('');
+  if (!blocks) return submission?.type === 'confirmation_only' ? '<p class="tool-hint">未填写内容，仅确认完成。</p>' : '<p class="tool-hint">没有提交内容。</p>';
+  return blocks;
+}
+function historyDetailPanel(state, local) {
+  const id = local.pane.slice('history:'.length), r = local.historyDetail[id];
+  if (!r) return `<div class="pane-heading">${historyBack}<h1>历史详情</h1></div><div class="pane-scroll detail-content"><p class="tool-hint">正在加载…</p></div><footer class="pane-footer">${historyReturn}</footer>`;
+  const status = r.status === 'completed' ? stateBadge('completed') : stateBadge('cancelled');
+  const steps = (r.steps || []).length ? `<ol class="checklist">${r.steps.map((step, i) => `<li class="check-row readonly ${(r.checks || []).includes(i) ? 'done' : ''}"><span class="check-visual">${icon('check')}</span><span class="check-title">${esc(step)}</span></li>`).join('')}</ol>` : '';
+  const request = `${r.description ? `<p>${esc(r.description)}</p>` : ''}${steps}${r.context ? `<h2>AI 上下文</h2><p>${esc(r.context)}</p>` : ''}${r.expectation ? `<h2>希望你告诉我</h2><p>${esc(r.expectation)}</p>` : ''}` || '<p class="tool-hint">没有请求详情。</p>';
+  const reply = r.status === 'completed' ? `<h2>你的回复</h2>${historyReplyHTML(r.result?.content, r.result?.submission)}` : '<p class="tool-hint">请求已取消，没有提交回复。</p>';
+  return `<div class="pane-heading">${historyBack}<h1>${esc(r.title)}</h1>${status}</div><div class="pane-scroll detail-content"><p class="history-meta">${esc(r.agent)} · 创建于 ${formatTime(r.createdAt)} · 结束于 ${formatTime(r.result?.completedAt || r.updatedAt)}</p><h2>AI 请求</h2>${request}${reply}</div><footer class="pane-footer">${historyReturn}</footer>`;
 }
 export function panelHTML(state, local) {
   const request = state.request, pane = local.pane;
   if (pane === 'settings') return settings(state);
+  if (pane === 'history') return historyList(state, local);
+  if (pane.startsWith('history:')) return historyDetailPanel(state, local);
   if (pane === 'note' || !request) return note(request, local);
   const tool = request.tools.find((t) => t.id === pane);
   if (tool) return toolPanel(request, tool, local, state.configUi);

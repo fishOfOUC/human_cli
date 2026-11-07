@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 const invoke = (action, data) => ipcRenderer.invoke('ask-for-user-help:command', { action, data });
 contextBridge.exposeInMainWorld('humanCli', {
   bootstrap: () => invoke('bootstrap'),
+  history: () => invoke('history'), historyDetail: (id) => invoke('historyDetail', { id }),
   draft: (data) => invoke('draft', data), complete: (data) => invoke('complete', data),
   addImage: (data) => invoke('addImage', data), removeImage: (id) => invoke('removeImage', { id }),
   uploadAttachment: (data) => invoke('uploadAttachment', data),

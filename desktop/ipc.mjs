@@ -21,6 +21,8 @@ export function registerIpc(service, windows, configUis) {
       const needRequest = () => fail(id, 'E_NO_REQUEST', '当前没有 AI 请求。');
       switch (action) {
         case 'bootstrap': return { ok: true, value: state(win) };
+        case 'history': return { ok: true, value: service.list() };
+        case 'historyDetail': fail(typeof data.id === 'string' && /^[a-f0-9-]{36}$/.test(data.id), 'E_HISTORY', '历史请求 ID 无效。'); return { ok: true, value: service.snapshot(data.id) };
         case 'hide': void configUis?.close(win); win.minimize(); break;
         case 'close': needRequest(); service.closeByUser(id); break;
         case 'preferences': service.preferences(data); break;
