@@ -78,7 +78,7 @@ Windows 截图使用 Electron 提供的物理显示器矩形和固定 System.Dra
 
 ## 数据
 
-默认 `%LOCALAPPDATA%\askForUserHelp`，可用 ASK_FOR_USER_HELP_DATA_DIR 覆盖。state.json 保存请求、回复、偏好和插件配置；attachments 保存原始附件；软件目录/cache 保存按便签组织的 JSON 与附件副本；plugins/providers.json 配置网络服务；runtime.json 保存本次 AI 接口地址和令牌。
+默认软件目录下 `.askForUserHelp-data`（打包后为 exe 同目录，源码运行为项目根目录；软件目录尚无 state.json 时回退到 `%LOCALAPPDATA%` 下的旧 askForUserHelp/human_cli/RelayNote 目录），可用 ASK_FOR_USER_HELP_DATA_DIR 覆盖。state.json 保存请求、回复、偏好和插件配置；attachments 保存原始附件；软件目录/cache 保存按便签组织的 JSON 与附件副本；plugins/providers.json 配置网络服务；runtime.json 保存本次 AI 接口地址和令牌。
 
 目前是本机单用户、单写者的原子 JSON 存储。网络插件可以在其他机器；AI 请求通道本身尚未扩展成远程多租户服务。未实现热重载、自动安装外部服务、签名安装器或自动更新。
 

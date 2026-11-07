@@ -7,7 +7,7 @@ SPI 是本项目的服务提供者协议：HTTP + JSON-RPC 2.0，版本为 askFo
 ## 接入一个服务
 
 1. 启动服务提供者。
-2. 在 `%LOCALAPPDATA%\askForUserHelp\plugins\providers.json` 中添加它的地址与令牌。
+2. 在软件目录下 `.askForUserHelp-data\plugins\providers.json` 中添加它的地址与令牌。
 3. 重启 askForUserHelp，让 AI 调用 `human_plugins` 查看目录，再在请求中绑定按钮。
 
 ```json

@@ -115,13 +115,13 @@ v2.0.2 进一步兼容可选 Agent/幂等键等空串占位。用户直接空内
   reply.json
   attachments/
 
-%LOCALAPPDATA%/askForUserHelp/
+<软件目录>/.askForUserHelp-data/
   state.json
   attachments/
   plugins/providers.json
 ```
 
-回复缓存默认在 askForUserHelp.exe 同目录的 cache 下，源码运行时在项目根目录/cache；与启动时的工作目录无关。ASK_FOR_USER_HELP_CACHE_DIR 可显式覆盖缓存根目录（例如隔离测试）。ASK_FOR_USER_HELP_DATA_DIR 仍覆盖状态、原始附件及配置目录，不改变默认回复缓存位置。为保留改名前的数据，如果新目录尚无状态且旧 RelayNote 目录存在状态，会继续使用旧目录；旧 RELAY_DATA_DIR 也作为兼容配置接受。升级前应退出旧桌面端。读取不删除缓存；完成后不保留供用户浏览的历史窗口。缓存清理能力保留在领域层。
+回复缓存默认在 askForUserHelp.exe 同目录的 cache 下，源码运行时在项目根目录/cache；与启动时的工作目录无关。ASK_FOR_USER_HELP_CACHE_DIR 可显式覆盖缓存根目录（例如隔离测试）。状态数据默认在软件目录下的 .askForUserHelp-data（打包后是 askForUserHelp.exe 同目录，源码运行时是项目根目录），与启动时的工作目录无关。ASK_FOR_USER_HELP_DATA_DIR 可显式覆盖数据目录（例如隔离测试）。为保留旧数据，如果软件目录下尚无 state.json，会依次回退到 %LOCALAPPDATA% 下的 askForUserHelp、human_cli、RelayNote 旧目录；旧 RELAY_DATA_DIR 也作为兼容配置接受。升级前应退出旧桌面端。读取不删除缓存；完成后不保留供用户浏览的历史窗口。缓存清理能力保留在领域层。
 
 ## 用户如何操作便签
 

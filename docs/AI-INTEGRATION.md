@@ -146,6 +146,6 @@ CLI request 默认等待用户完成；只有 --background 明确后台创建并
 
 HTTP 接口为 `GET /logs?limit=50&offset=0`，使用现有本机 Bearer 认证。日志接口不读取调用者指定的任意路径，仅返回工具管理的缓存位置。
 
-默认数据目录 `%LOCALAPPDATA%/askForUserHelp`；适配器和桌面端应使用相同 ASK_FOR_USER_HELP_DATA_DIR。runtime.json 含访问令牌，不是可分享配置。ASK_FOR_USER_HELP_NO_AUTOSTART=1 可关闭自动启动。
+默认数据目录为软件目录下 `.askForUserHelp-data`（打包后为 exe 同目录，源码运行为项目根目录）；适配器和桌面端应使用相同 ASK_FOR_USER_HELP_DATA_DIR。runtime.json 含访问令牌，不是可分享配置。ASK_FOR_USER_HELP_NO_AUTOSTART=1 可关闭自动启动。
 
 缓存路径指向运行 askForUserHelp 的机器。AI 若运行在另一台机器，需要自己已有的文件访问方式；askForUserHelp 不会自动暴露文件到公网，也不会向已经结束的 AI 会话主动注入消息。

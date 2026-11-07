@@ -15,19 +15,20 @@ test('new askForUserHelp data path honors explicit configuration and preserves l
   t.after(() => { for (const [key, value] of previous) { if (value === undefined) delete process.env[key]; else process.env[key] = value; } });
   delete process.env.ASK_FOR_USER_HELP_DATA_DIR; delete process.env.HUMAN_CLI_DATA_DIR; delete process.env.RELAY_DATA_DIR;
   process.env.LOCALAPPDATA = directory;
-  assert.equal(dataDirectory(), join(directory, 'askForUserHelp'));
-  const previousName = join(directory, 'human_cli'); mkdirSync(previousName);
+  const software = join(directory, 'app');
+  assert.equal(dataDirectory({ software }), join(software, '.askForUserHelp-data'));
+  const previousName = join(directory, 'askForUserHelp'); mkdirSync(previousName);
   writeFileSync(join(previousName, 'state.json'), '{}');
-  assert.equal(dataDirectory(), previousName);
+  assert.equal(dataDirectory({ software }), previousName);
   const legacy = join(directory, 'RelayNote'); mkdirSync(legacy);
   writeFileSync(join(legacy, 'state.json'), '{}');
-  assert.equal(dataDirectory(), previousName);
+  assert.equal(dataDirectory({ software }), previousName);
   process.env.RELAY_DATA_DIR = join(directory, 'old-config');
-  assert.equal(dataDirectory(), process.env.RELAY_DATA_DIR);
+  assert.equal(dataDirectory({ software }), process.env.RELAY_DATA_DIR);
   process.env.HUMAN_CLI_DATA_DIR = join(directory, 'previous-config');
-  assert.equal(dataDirectory(), process.env.HUMAN_CLI_DATA_DIR);
+  assert.equal(dataDirectory({ software }), process.env.HUMAN_CLI_DATA_DIR);
   process.env.ASK_FOR_USER_HELP_DATA_DIR = join(directory, 'new-config');
-  assert.equal(dataDirectory(), process.env.ASK_FOR_USER_HELP_DATA_DIR);
+  assert.equal(dataDirectory({ software }), process.env.ASK_FOR_USER_HELP_DATA_DIR);
 });
 
 test('renamed built-in plugins retain previous request bindings and saved configurations', (t) => {
