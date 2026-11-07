@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld('humanCli', {
   openConfigUi: (id, bounds) => invoke('openConfigUi', { id, bounds }), closeConfigUi: () => invoke('closeConfigUi'), configUiBounds: (id, bounds) => invoke('configUiBounds', { id, bounds }),
   attachImage: (id) => invoke('attachImage', { id }), attachError: (id) => invoke('attachError', { id }), removeError: (id) => invoke('removeError', { id }),
   saveResult: (id) => invoke('saveResult', { id }), copyText: (text) => invoke('copyText', { text }),
-  preferences: (data) => invoke('preferences', data), hide: () => invoke('hide'), close: () => invoke('close'),
+  preferences: (data) => invoke('preferences', data), hide: () => invoke('hide'), close: () => invoke('close'), dismiss: () => invoke('dismiss'),
   beginResize: (edge, replyHeight) => invoke('beginResize', { edge, replyHeight }), resize: () => invoke('resize'), endResize: () => invoke('endResize'),
   onState: (callback) => { const listener = (_event, value) => callback(value); ipcRenderer.on('ask-for-user-help:state', listener); return () => ipcRenderer.removeListener('ask-for-user-help:state', listener); },
   onCloseRequest: (callback) => { const listener = () => callback(); ipcRenderer.on('ask-for-user-help:close-request', listener); return () => ipcRenderer.removeListener('ask-for-user-help:close-request', listener); },
