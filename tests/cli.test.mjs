@@ -30,6 +30,7 @@ test('a lost creation response retries with the same idempotency key and creates
   const { service, run } = await setup(t, async (service) => {
     const server = createServer(async (req, res) => {
       if (req.url === '/health') { res.end(JSON.stringify({ name: 'askForUserHelp' })); return; }
+      if (req.method !== 'POST') { res.end(JSON.stringify(req.url === '/preferences' ? { foregroundOnly: false } : {})); return; }
       const chunks = []; for await (const chunk of req) chunks.push(chunk);
       const input = JSON.parse(Buffer.concat(chunks).toString()); keys.push(input.idempotencyKey);
       const request = service.create(input);
@@ -85,6 +86,29 @@ test('CLI rejects misspelled request options instead of silently changing the wa
   const result = await run(['request', '--backgroun'], '{}').done;
   assert.equal(result.code, 1); assert.equal(result.stdout, ''); assert.match(result.stderr, /用法/);
   assert.equal(service.list().length, 0);
+});
+
+test('foreground-only preference turns background calls into waiting replies with an added notice', async (t) => {
+  const { service, run } = await setup(t);
+  service.preferences({ foregroundOnly: true });
+  const command = run(['request', '-', '--background'], JSON.stringify({ title: '强制前台', plugins: [] }));
+  const request = await until(() => service.list()[0]);
+  await until(() => service.snapshot(request.id).receiver.waiting);
+  await new Promise((done) => setTimeout(done, 40));
+  assert.equal(command.settled, false);
+  service.complete(request.id, { version: 1, reply: '前台完成' });
+  const result = await command.done, value = JSON.parse(result.stdout);
+  assert.equal(result.code, 0); assert.equal(value.status, 'completed');
+  const texts = value.content.map((b) => b.text || '').join('\n');
+  assert.match(texts, /用户已勾选仅允许前台调用/);
+  assert.equal(service.list().length, 1);
+
+  const direct = run(['request', '-'], JSON.stringify({ title: '前台调用', plugins: [] }));
+  const second = await until(() => service.list().find((r) => r.title === '前台调用'));
+  await until(() => service.snapshot(second.id).receiver.waiting);
+  service.complete(second.id, { version: 1, reply: '正常回复' });
+  const normal = JSON.parse((await direct.done).stdout);
+  assert.doesNotMatch(normal.content.map((b) => b.text || '').join('\n'), /仅允许前台调用/);
 });
 
 test('disconnecting a default CLI request leaves human work and subsequent cached reply recoverable', async (t) => {

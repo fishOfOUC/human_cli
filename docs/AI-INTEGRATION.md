@@ -144,6 +144,8 @@ AI 根据标题和时间找到原便签，直接读取 replyPath；其中 image/
 
 CLI request 默认等待用户完成；只有 --background 明确后台创建并立即返回 ID。wait <ID> 用于恢复等待已有任务。还支持 get、cancel、list、plugins；--help 显示用法。默认结果包含 schemaVersion、requestId、status 与有序 content；空提交 content=[] 并附 submission.type=confirmation_only 的系统说明，取消不发送草稿，丢弃时返回 replyState=discarded 并省略 content。旧调用者可显式使用 --format legacy 或 MCP format=legacy，图片分页也只在 legacy 下保留；legacy 无法无损表达穿插。request - 从标准输入读取 UTF-8 JSON，最终输出写入 stdout，等待开始的 waiting_for_user 元数据和错误写入 stderr；错误返回非零退出码。
 
+用户可在便签设置中勾选「禁止 AI 后台运行」（foregroundOnly）。勾选后，AI 即便使用 --background 或 MCP background:true，调用也会阻塞等待用户回复才返回，且返回的回复末尾会追加一句「用户已勾选仅允许前台调用。」；前台调用不受影响。适配器通过 `GET /preferences` 读取该开关，读取失败时按未勾选处理。设置中还可勾选「回复后窗口不自动关闭」（keepOpen），完成或取消后便签保留在屏幕上，直到用户手动关闭。
+
 HTTP 接口为 `GET /logs?limit=50&offset=0`，使用现有本机 Bearer 认证。日志接口不读取调用者指定的任意路径，仅返回工具管理的缓存位置。
 
 默认数据目录为软件目录下 `.askForUserHelp-data`（打包后为 exe 同目录，源码运行为项目根目录）；适配器和桌面端应使用相同 ASK_FOR_USER_HELP_DATA_DIR。runtime.json 含访问令牌，不是可分享配置。ASK_FOR_USER_HELP_NO_AUTOSTART=1 可关闭自动启动。

@@ -56,13 +56,13 @@ else {
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => callback({ responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': ["default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' ask-for-user-help-asset: data:; connect-src 'self' ask-for-user-help-asset:; object-src 'none'; frame-src 'none'"] } }));
   const configUis = new ConfigUiManager(service);
-  const lifecycle = new OnDemandLifecycle(() => service.list().some((r) => r.status === 'pending'), () => app.quit());
+  const lifecycle = new OnDemandLifecycle(() => service.list().some((r) => r.status === 'pending') || (service.store.data.preferences.keepOpen && windows.hasOpen()), () => app.quit());
   registerIpc(service, windows, configUis);
   const api = await startApi(service, { activity: (path) => lifecycle.begin(path) });
   writeFileSync(runtimePath(), JSON.stringify({ url: api.url, token: api.token, pid: process.pid, version: '2.0.3' }), { mode: 0o600 });
   service.on('change', ({ id, event }) => {
     if (event === 'created') windows.open(id);
-    else if (service.get(id).status !== 'pending') windows.finish(id);
+    else if (service.get(id).status !== 'pending' && !service.store.data.preferences.keepOpen) windows.finish(id);
     lifecycle.changed();
   });
   app.on('second-instance', () => { for (const win of windows.windows.values()) { if (win.isMinimized()) win.restore(); win.show(); } });

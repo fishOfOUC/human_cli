@@ -19,7 +19,9 @@ try {
     const files = args.filter((value) => value !== '--background');
     if (files.length > 1 || files.some((value) => value.startsWith('--'))) throw new Error('用法：askForUserHelp.exe request [file.json|-] [--background]');
     const input = JSON.parse(readFileSync(!files[0] || files[0] === '-' ? 0 : files[0], 'utf8').replace(/^\uFEFF/, ''));
-    result = output(await requestHuman(input, { background, onCreated: (request) => process.stderr.write(`${JSON.stringify({ event: 'waiting_for_user', requestId: request.id })}\n`) }), { background });
+    const request = await requestHuman(input, { background, onCreated: (created) => process.stderr.write(`${JSON.stringify({ event: 'waiting_for_user', requestId: created.id })}\n`) });
+    // Foreground-only preference turns a background call into a waiting reply; project by the actual outcome.
+    result = output(request, { background: background && request.status === 'pending' });
   }
   else if (command === 'get' || command === 'result') result = await api(`/requests/${id}${command === 'result' ? `/result${format === 'legacy' ? '?format=legacy' : ''}` : ''}`);
   else if (command === 'wait') result = output(await waitForHuman(id));

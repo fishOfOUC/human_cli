@@ -207,7 +207,9 @@ export class RequestService extends EventEmitter {
     if (patch.theme !== undefined) fail(themes.includes(patch.theme), 'E_THEME', '未知主题。');
     if (patch.pinned !== undefined) fail(typeof patch.pinned === 'boolean', 'E_PIN', '置顶值必须为布尔值。');
     if (patch.motion !== undefined) fail(typeof patch.motion === 'boolean', 'E_MOTION', '动效值必须为布尔值。');
-    Object.assign(this.store.data.preferences, { ...(patch.theme !== undefined ? { theme: patch.theme } : {}), ...(patch.pinned !== undefined ? { pinned: patch.pinned } : {}), ...(patch.motion !== undefined ? { motion: patch.motion } : {}) });
+    if (patch.foregroundOnly !== undefined) fail(typeof patch.foregroundOnly === 'boolean', 'E_FOREGROUND_ONLY', '仅前台调用值必须为布尔值。');
+    if (patch.keepOpen !== undefined) fail(typeof patch.keepOpen === 'boolean', 'E_KEEP_OPEN', '保留窗口值必须为布尔值。');
+    Object.assign(this.store.data.preferences, { ...(patch.theme !== undefined ? { theme: patch.theme } : {}), ...(patch.pinned !== undefined ? { pinned: patch.pinned } : {}), ...(patch.motion !== undefined ? { motion: patch.motion } : {}), ...(patch.foregroundOnly !== undefined ? { foregroundOnly: patch.foregroundOnly } : {}), ...(patch.keepOpen !== undefined ? { keepOpen: patch.keepOpen } : {}) });
     this.store.save(); this.emit('preferences', this.store.data.preferences); return this.store.data.preferences;
   }
   configure(id, toolId, config) {

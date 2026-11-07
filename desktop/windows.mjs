@@ -105,6 +105,7 @@ export class WindowManager {
     setImmediate(() => { if (!win.isDestroyed()) win.destroy(); });
   }
   forSender(sender) { return [...this.windows.values()].find((win) => win.webContents === sender && !win.isDestroyed()); }
+  hasOpen() { return [...this.windows.values()].some((win) => !win.isDestroyed()); }
   displayChanged() {
     for (const win of this.windows.values()) {
       delete win.resizeSession;

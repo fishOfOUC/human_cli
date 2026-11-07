@@ -23,6 +23,7 @@ export async function startApi(service, { activity } = {}) {
       if (req.method === 'GET' && url.pathname === '/plugins') return send(200, service.plugins.list());
       if (req.method === 'GET' && url.pathname === '/logs') return send(200, service.logs({ limit: Number(url.searchParams.get('limit') || 50), offset: Number(url.searchParams.get('offset') || 0) }));
       if (req.method === 'GET' && url.pathname === '/requests') return send(200, service.list());
+      if (req.method === 'GET' && url.pathname === '/preferences') return send(200, service.store.data.preferences);
       if (req.method === 'POST' && url.pathname === '/requests') return send(201, service.create(await body(req)));
       const match = url.pathname.match(/^\/requests\/([a-f0-9-]+)(?:\/(wait|cancel|result))?$/);
       fail(match, 'E_ROUTE', '接口不存在。', 404);

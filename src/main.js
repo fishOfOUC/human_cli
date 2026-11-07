@@ -123,7 +123,10 @@ async function finish() {
   } finally { completing = false; }
 }
 async function closeRequest() {
-  if (closing || state?.request?.status !== 'pending') return;
+  if (!state?.request) return;
+  // A kept-open finished note (回复后不自动关闭) dismisses its window directly.
+  if (state.request.status !== 'pending') { await call('dismiss'); return; }
+  if (closing) return;
   const saving = saveDraft();
   completionSequence++;
   closing = true; clearTimeout(draftTimer);
@@ -161,6 +164,8 @@ const actions = {
   close: () => closeRequest(),
   theme: (button) => call('preferences', { theme: button.dataset.theme }),
   motion: () => call('preferences', { motion: state.preferences.motion === false }),
+  foregroundOnly: () => call('preferences', { foregroundOnly: state.preferences.foregroundOnly !== true }),
+  keepOpen: () => call('preferences', { keepOpen: state.preferences.keepOpen !== true }),
   run: async (button) => { await call('runTool', button.dataset.tool); },
   image: (button) => pane(`image:${button.dataset.id}`),
   'remove-image': (button) => call('removeImage', button.dataset.id),
