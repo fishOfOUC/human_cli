@@ -20,6 +20,7 @@
     "test:reply": "electron tests/native-ordered-reply.mjs",
     "test:input": "electron tests/native-input.mjs",
     "test:pin": "electron tests/native-pin.mjs",
+    "test:preferences": "electron tests/native-preferences.mjs",
     "setup": "node node_modules/electron/install.js",
     "postinstall": "npm run setup"
   },
