@@ -57,6 +57,8 @@ else {
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => callback({ responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': ["default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' ask-for-user-help-asset: data:; connect-src 'self' ask-for-user-help-asset:; object-src 'none'; frame-src 'none'"] } }));
   const configUis = new ConfigUiManager(service);
   const lifecycle = new OnDemandLifecycle(() => service.list().some((r) => r.status === 'pending') || (service.store.data.preferences.keepOpen && windows.hasOpen()), () => app.quit());
+  // Window destruction alone (e.g. dismissing the last kept-open note) must re-evaluate exit.
+  windows.onChanged = () => lifecycle.changed();
   registerIpc(service, windows, configUis);
   const api = await startApi(service, { activity: (path) => lifecycle.begin(path) });
   writeFileSync(runtimePath(), JSON.stringify({ url: api.url, token: api.token, pid: process.pid, version: '2.0.3' }), { mode: 0o600 });

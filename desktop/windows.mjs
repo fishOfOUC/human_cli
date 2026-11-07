@@ -46,7 +46,7 @@ export class WindowManager {
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     win.webContents.on('will-navigate', (event) => event.preventDefault());
     win.on('close', (event) => { if (!this.quitting) { event.preventDefault(); win.webContents.send('ask-for-user-help:close-request'); } });
-    win.on('closed', () => { clearTimeout(saveTimer); this.windows.delete(key); });
+    win.on('closed', () => { clearTimeout(saveTimer); this.windows.delete(key); this.onChanged?.(); });
     let saveTimer;
     const persistGeometry = () => {
       if (restoring || win.isDestroyed() || win.isMinimized() || win.isMaximized() || this.captureActive) return;
