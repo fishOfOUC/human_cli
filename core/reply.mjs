@@ -4,6 +4,7 @@ export const emptySubmission = () => ({ type: 'confirmation_only', message: '用
 
 export function projectReply(request, { background = false } = {}) {
   const reply = { schemaVersion: 1, requestId: request.id, status: request.status };
+  if (request.status === 'pending' && request.background?.by === 'user') reply.background = { ...request.background };
   if (background) return reply;
   if (request.cancelReason) reply.cancelReason = request.cancelReason;
   if (request.status === 'cancelled' && request.cancelledBy === 'user') reply.cancelledBy = 'user';

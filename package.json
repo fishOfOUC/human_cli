@@ -21,6 +21,7 @@
     "test:input": "electron tests/native-input.mjs",
     "test:pin": "electron tests/native-pin.mjs",
     "test:preferences": "electron tests/native-preferences.mjs",
+    "test:background": "electron tests/native-background.mjs",
     "setup": "node node_modules/electron/install.js",
     "postinstall": "npm run setup"
   },

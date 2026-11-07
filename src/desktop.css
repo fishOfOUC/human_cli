@@ -15,7 +15,7 @@
 .bookmark.running { background:var(--accent-soft); color:var(--accent-ink); }.bookmark.running svg { animation:pulse 1.2s infinite; }.bookmark.success { background:var(--success-bg); color:var(--success-ink); }.bookmark.error { background:var(--error-bg); color:var(--negative); }
 .rail-separator { height:1px; min-height:1px; background:var(--border); margin:3px 2px; }
 .pane-scroll { flex:1; min-height:0; overflow:auto; padding:14px 14px 10px; scrollbar-width:thin; scrollbar-color:var(--control) transparent; }
-.waiting-label { display:flex; align-items:center; gap:5px; flex-shrink:0; color:var(--accent-ink); }.status-dot { width:5px; height:5px; background:currentColor; border-radius:50%; flex-shrink:0; }
+.background-action { min-height:28px; padding:0; flex-shrink:0; color:var(--muted); font-size:11px; }.background-action:hover:not(:disabled) { text-decoration:underline; }.background-action:disabled { cursor:default; opacity:1; }
 h1 { margin-top:9px; font-size:18px; font-weight:650; line-height:1.4; letter-spacing:-.025em; white-space:pre-line; overflow-wrap:anywhere; }
 .description { color:var(--muted); margin-top:5px; font-size:11px; line-height:1.65; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; white-space:pre-line; }
 .progress-row { display:flex; align-items:center; gap:9px; margin-top:12px; font-size:11px; font-variant-numeric:tabular-nums; color:var(--muted); }.progress-track { flex:1; height:3px; border-radius:4px; background:var(--border); overflow:hidden; }.progress-fill { height:100%; background:var(--accent); transition:width .35s var(--ease); }

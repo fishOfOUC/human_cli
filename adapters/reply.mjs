@@ -1,6 +1,9 @@
 export { projectReply } from '../core/reply.mjs';
 
 export function legacySnapshot(request) {
+  if (request.status === 'pending' && request.background?.by === 'user') return {
+    id: request.id, status: request.status, background: request.background, result: null, cache: request.cache,
+  };
   if (request.status === 'cancelled' && request.cancelledBy === 'user') return {
     id: request.id, status: request.status, cancelledBy: 'user', cancelReason: request.cancelReason, result: null, cache: request.cache,
   };

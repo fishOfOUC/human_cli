@@ -65,6 +65,35 @@ test('one normal MCP human_request waits through user drafting and returns the c
   await client.callTool({ name: 'human_cancel', arguments: { requestId: other.requestId, reason: '不再需要' } });
   assert.equal(service.get(other.requestId).status, 'cancelled');
 });
+test('MCP request and wait return the user background notice in JSON and legacy formats', async (t) => {
+  const { service, directory } = fixture(t), api = await startApi(service);
+  t.after(() => { api.server.closeAllConnections(); return new Promise((r) => api.server.close(r)); });
+  writeFileSync(join(directory, 'runtime.json'), JSON.stringify({ url: api.url, token: api.token }));
+  const client = new Client({ name: 'background-client', version: '1' });
+  await client.connect(new StdioClientTransport({ command: process.execPath, args: [fileURLToPath(new URL('../adapters/mcp.mjs', import.meta.url))], env: { ...process.env, ASK_FOR_USER_HELP_DATA_DIR: directory, ASK_FOR_USER_HELP_NO_AUTOSTART: '1' }, stderr: 'pipe' }));
+  t.after(() => client.close());
+  for (const format of ['json', 'legacy']) {
+    const calling = client.callTool({ name: 'human_request', arguments: { title: `用户后台 ${format}`, plugins: [], format } });
+    const r = await until(() => service.list().find((r) => r.title === `用户后台 ${format}`));
+    await until(() => service.snapshot(r.id).receiver.waiting);
+    service.draft(r.id, { reply: '尚未提交的草稿' });
+    service.backgroundByUser(r.id);
+    const response = await calling;
+    assert.ok(!response.isError, JSON.stringify(response));
+    const reply = JSON.parse(response.content[0].text);
+    assert.equal(reply.status, 'pending'); assert.equal(reply.background.by, 'user');
+    assert.match(reply.background.message, /无需阻塞等待/);
+    assert.match(reply.background.message, /过程可能耗时较长，用户选择进入后台等待/);
+    assert.match(reply.background.message, /human_logs.*reply\.json/);
+    assert.doesNotMatch(response.content[0].text, /尚未提交的草稿/);
+    const again = await client.callTool({ name: 'human_wait', arguments: { requestId: r.id, format } });
+    assert.equal(JSON.parse(again.content[0].text).background.by, 'user');
+    service.complete(r.id, { version: 1, reply: '后台处理完毕' });
+    const done = await client.callTool({ name: 'human_wait', arguments: { requestId: r.id } });
+    assert.equal(JSON.parse(done.content[0].text).content[0].text, '后台处理完毕');
+  }
+});
+
 test('MCP client timeout recovers reply using logs and local files without original request ID or acknowledgement', async (t) => {
   const { service, directory } = fixture(t), api = await startApi(service);
   t.after(() => { api.server.closeAllConnections(); return new Promise((resolve) => api.server.close(resolve)); });

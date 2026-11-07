@@ -110,6 +110,8 @@ patch 仅支持上述六类字段。省略或 null 表示不修改，空字符�
 
 断线不等于取消。ID 已知时恢复原等待；ID 丢失时用 `human_logs`，例如 `{"limit":50,"offset":0}`，按标题、创建时间和上下文定位。`nextOffset` 非 null 时继续翻页。不要因客户端超时而自动重新创建同一请求。
 
+用户点击便签底部「进入后台等待」时，正在等待的 request/wait 返回 `status=pending` 和 `background: {by: "user", at: "时间", message: "过程可能耗时较长，用户选择进入后台等待，完成后可通过日志读取结果的说明"}`。AI 应继续其他工作，稍后按 `requestId` 查询，不重复创建便签或循环 wait；未完成时再次 wait 会立即返回后台通知，完成后查询返回正式回复。CLI 与 MCP、json 与 legacy 格式均保留该通知，未提交的草稿不会作为正式回复发送。用户主动切换后台不受「禁止 AI 后台运行」偏好限制。
+
 ## CLI
 
 使用实际的 EXE 绝对路径。下面示例在 PowerShell 中运行：
@@ -141,7 +143,7 @@ $HumanCli = 'E:\Tools\askForUserHelp\askForUserHelp.exe'
 
 ```powershell
 & $HumanCli request 'E:\Work\协助请求.json'
-# 默认等待用户完成或取消。stdout 是最终 UTF-8 JSON。
+# 默认等待用户完成、取消或主动切换后台。stdout 是 UTF-8 JSON。
 # stderr 中 waiting_for_user 事件包含 requestId，可在连接断开后恢复。
 ```
 

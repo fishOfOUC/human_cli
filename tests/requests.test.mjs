@@ -7,6 +7,52 @@ import { JsonStore } from '../core/store.mjs';
 import { AttachmentStore } from '../core/attachments.mjs';
 import { RequestService } from '../core/requests.mjs';
 
+test('user backgrounding releases all waiters, survives reload, preserves drafts and allows later completion', async (t) => {
+  const { service, directory, plugins } = fixture(t);
+  service.preferences({ foregroundOnly: true });
+  const r = service.create({ title: '稍后回复', plugins: [], steps: ['稍后处理'] });
+  service.draft(r.id, { reply: '尚未提交的草稿', checks: [0] });
+  const first = service.wait(r.id), second = service.wait(r.id);
+  assert.equal(service.waiters.get(r.id).size, 2);
+  const backgrounded = service.backgroundByUser(r.id);
+  for (const reply of await Promise.all([first, second])) {
+    assert.equal(reply.status, 'pending'); assert.equal(reply.background.by, 'user');
+    assert.equal(reply.result, null); assert.equal(reply.version, r.version);
+  }
+  assert.equal(service.waiters.size, 0);
+  assert.equal(service.backgroundByUser(r.id).background.at, backgrounded.background.at);
+  const store = new JsonStore(directory);
+  const restored = new RequestService(store, new AttachmentStore(store), plugins);
+  const reply = await restored.wait(r.id);
+  assert.equal(reply.background.by, 'user'); assert.equal(reply.reply, '尚未提交的草稿');
+  assert.deepEqual(reply.checks, [0]);
+  assert.equal(restored.reply(r.id).content, undefined);
+  assert.match(restored.reply(r.id).background.message, /无需阻塞等待/);
+  assert.match(restored.reply(r.id).background.message, /过程可能耗时较长，用户选择进入后台等待/);
+  assert.match(restored.reply(r.id).background.message, /human_logs.*reply\.json/);
+  restored.complete(r.id, { version: r.version, reply: '稍后完成的回复' });
+  assert.equal((await restored.wait(r.id)).status, 'completed');
+  assert.equal(restored.reply(r.id).background, undefined);
+  assert.equal(restored.reply(r.id).content[0].text, '稍后完成的回复');
+  const log = restored.logs().entries.find((entry) => entry.id === r.id);
+  assert.equal(log.status, 'completed');
+  assert.equal(JSON.parse(readFileSync(log.cache.replyPath, 'utf8')).content[0].text, '稍后完成的回复');
+  assert.throws(() => restored.backgroundByUser(r.id), { code: 'E_REQUEST_CLOSED' });
+});
+
+test('failed background persistence leaves the request waiting and retryable', async (t) => {
+  const { service, store } = fixture(t), r = service.create({ title: '落盘失败', plugins: [] });
+  const save = store.save;
+  store.save = () => { throw new Error('disk unavailable'); };
+  assert.throws(() => service.backgroundByUser(r.id), /disk unavailable/);
+  assert.equal(service.get(r.id).background, undefined);
+  store.save = save;
+  const waiting = service.wait(r.id);
+  assert.equal(service.snapshot(r.id).receiver.waiting, true);
+  service.backgroundByUser(r.id);
+  assert.equal((await waiting).background.by, 'user');
+});
+
 test('AI request creation validates plugin configuration and preserves instruction fields', (t) => {
   const { service } = fixture(t);
   const r = service.create({ title: '帮我验收', agent: 'AI', steps: ['打开应用'] });

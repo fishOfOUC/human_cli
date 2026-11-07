@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('humanCli', {
   bootstrap: () => invoke('bootstrap'),
   history: () => invoke('history'), historyDetail: (id) => invoke('historyDetail', { id }),
   draft: (data) => invoke('draft', data), complete: (data) => invoke('complete', data),
+  background: () => invoke('background'),
   addImage: (data) => invoke('addImage', data), removeImage: (id) => invoke('removeImage', { id }),
   uploadAttachment: (data) => invoke('uploadAttachment', data),
   runTool: (id) => invoke('runTool', { id }), configureTool: (id, config) => invoke('configureTool', { id, config }),

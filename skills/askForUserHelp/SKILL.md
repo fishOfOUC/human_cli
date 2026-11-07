@@ -29,12 +29,13 @@ askForUserHelp 是 AI 请求用户协助操作的软件。AI 把需要人参与�
 
 1. 为本次逻辑请求生成唯一的 `idempotencyKey`；同一次创建重试保持原键，新任务使用新键。不要照抄示例键用于所有任务。
 2. 正常调用 `human_request` 或 CLI `request`，默认在同一次调用中等待用户回复。只有明确需要后台创建（推荐此时询问用户，不要自己推测。询问一次就好）时才使用 `background: true` / `--background`，然后对已有 ID 等待。
-3. 不设置用户操作期限。最小化、用户打字或保存草稿都不会结束请求。宿主工具调用可能有自己的超时；CLI 长时间运行时保留执行会话，继续等待其输出。
-4. 连接断开或 AI 重启后，保留已有 `requestId`，用 `human_get` 查看状态，再对 pending 请求恢复 `human_wait`。丢失 ID 时通过 `human_logs` 按标题、项目背景和创建时间定位；不要直接重复创建便签。
+3. 不设置用户操作期限。右上角「－」最小化、用户打字或保存草稿都不会结束请求。用户点击底部「进入后台等待」会结束当前等待并返回 `status=pending`、`background.by=user` 和说明（过程可能耗时较长，用户选择进入后台等待，用户完成后可通过 human_logs/CLI logs 定位 reply.json 读取结果）；此时继续其他工作，不再阻塞等待、不重复创建便签，稍后按原 ID 查询回复。宿主工具调用可能有自己的超时；普通 CLI 长时间运行时保留执行会话，继续等待其输出。
+4. 连接断开或 AI 重启后，保留已有 `requestId`，用 `human_get` 查看状态。pending 且没有 `background.by=user` 时恢复 `human_wait`；用户已主动切换后台时用 get/result 或 human_get/human_logs 稍后查询，不循环调用 wait。丢失 ID 时通过 `human_logs` 按标题、项目背景和创建时间定位；不要直接重复创建便签。
 5. 只在协助目标发生变化时更新说明，携带 `human_get` 返回的当前 `version`。AI 不再需要协助时可取消已有请求。
 
 ## 理解用户交回的结果
 
+- `pending` 且 `background.by=user`：用户主动将该便签切换为后台运行，AI 无需阻塞等待。这不是完成或取消，也不表示用户已提交草稿；后台便签仍可稍后完成回复。再次 wait 在未完成时也会立即返回同一后台通知。
 - `completed`：按 `content[]` 原顺序处理 `text`、`image`、`file`、`diagnostic`，文字与附件的穿插有含义。MCP 外层只有一个 text 块，它的文本是回复 JSON；内层 `content[]` 才是用户内容。
 - 图片和文件通过绝对 `path` 交付。使用自身文件/图片工具读取对应文件，不要求用户重新上传，也不要把未读取的附件当成已看过。默认不回传二进制、Base64 或 MCP 图片块。
 - `submission.type = confirmation_only`：用户点击了完成，软件收到的正文与附件均为空。这不是验收通过的证据，也不能据此判断用户输入丢失。根据原请求判断是否足够继续。

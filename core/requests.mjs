@@ -86,6 +86,18 @@ export class RequestService extends EventEmitter {
       throw error;
     }
   }
+  backgroundByUser(id) {
+    const r = this.pending(id);
+    if (r.background?.by === 'user') return this.snapshot(id);
+    const previousUpdated = r.updatedAt;
+    r.background = { by: 'user', at: new Date().toISOString(), message: '该过程可能耗时较长，用户选择进入后台等待。便签仍保留，用户可继续操作并在完成后提交回复。AI 无需阻塞等待，可继续其他工作，请勿重复创建便签；用户完成后，可通过 human_logs（CLI: logs）按 requestId 定位日志并读取 reply.json 得到结果，也可按原 requestId 查询结果。' };
+    try { return this.changed(r, 'backgrounded'); }
+    catch (error) {
+      delete r.background; r.updatedAt = previousUpdated;
+      try { this.store.save(); this.cache.sync(r); } catch {}
+      throw error;
+    }
+  }
   draft(id, { reply, checks, content }) {
     const r = this.pending(id);
     let next = r.content;
@@ -185,7 +197,7 @@ export class RequestService extends EventEmitter {
     return { cacheDirectory: this.cache.root, total: entries.length, entries: entries.slice(offset, offset + limit), nextOffset: offset + limit < entries.length ? offset + limit : null };
   }
   async wait(id, signal) {
-    const r = this.get(id); if (r.status !== 'pending') return this.snapshot(id);
+    const r = this.get(id); if (r.status !== 'pending' || r.background?.by === 'user') return this.snapshot(id);
     return new Promise((resolve, reject) => {
       const key = randomUUID();
       if (!this.waiters.has(id)) this.waiters.set(id, new Set());
@@ -197,7 +209,7 @@ export class RequestService extends EventEmitter {
       };
       const done = () => { cleanup(); resolve(this.snapshot(id)); };
       const disconnected = () => { cleanup(); reject(Object.assign(new Error('等待连接已断开；请求和本地回复仍然保留。'), { code: 'E_WAIT_DISCONNECTED' })); };
-      const onChange = (event) => { if (event.id === id && this.get(id).status !== 'pending') done(); };
+      const onChange = (event) => { if (event.id === id && (this.get(id).status !== 'pending' || this.get(id).background?.by === 'user')) done(); };
       this.on('change', onChange); signal?.addEventListener('abort', disconnected, { once: true });
       this.emit('connection', { id });
       if (signal?.aborted) disconnected();

@@ -70,7 +70,29 @@ test('CLI request is one blocking human interaction and never returns while the 
   assert.deepEqual(readFileSync(cached.content[1].path), png);
 });
 
-test('CLI only returns immediately with explicit --background, including stdin and file forms', async (t) => {
+test('CLI request returns a user background notice without delivering the draft, including legacy output', async (t) => {
+  const { service, run } = await setup(t);
+  service.preferences({ foregroundOnly: true });
+  for (const format of ['json', 'legacy']) {
+    const command = run(['request', '-', '--background', '--format', format], JSON.stringify({ title: `用户后台 ${format}`, plugins: [] }));
+    const r = await until(() => service.list().find((r) => r.title === `用户后台 ${format}`));
+    await until(() => service.snapshot(r.id).receiver.waiting);
+    service.draft(r.id, { reply: '不应作为正式回复发送' });
+    service.backgroundByUser(r.id);
+    const result = await command.done, reply = JSON.parse(result.stdout);
+    assert.equal(result.code, 0, result.stderr); assert.equal(reply.status, 'pending');
+    assert.equal(reply.background.by, 'user'); assert.match(reply.background.message, /无需阻塞等待/);
+    assert.equal(reply.content, undefined);
+    assert.doesNotMatch(result.stdout, /不应作为正式回复发送/);
+    const waitingAgain = JSON.parse((await run(['wait', r.id]).done).stdout);
+    assert.equal(waitingAgain.background.by, 'user');
+    service.complete(r.id, { version: 1, reply: '后台完成' });
+    const completed = JSON.parse((await run(['result', r.id]).done).stdout);
+    assert.equal(completed.status, 'completed'); assert.equal(completed.content[0].text, '后台完成');
+  }
+});
+
+test('CLI only creates without waiting with explicit --background, including stdin and file forms', async (t) => {
   const { service, directory, run } = await setup(t);
   const input = JSON.stringify({ title: '明确后台创建', plugins: [] });
   const file = join(directory, '请求.json'); writeFileSync(file, input);

@@ -162,6 +162,10 @@ const actions = {
   pane: (button) => openHistoryPane(button.dataset.pane),
   hide: () => call('hide'), pin: () => call('preferences', { pinned: !state.preferences.pinned }),
   close: () => closeRequest(),
+  background: async () => {
+    if (closing || completing || composing || state.request?.status !== 'pending') return;
+    await call('background');
+  },
   theme: (button) => call('preferences', { theme: button.dataset.theme }),
   motion: () => call('preferences', { motion: state.preferences.motion === false }),
   foregroundOnly: () => call('preferences', { foregroundOnly: state.preferences.foregroundOnly !== true }),

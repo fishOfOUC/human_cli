@@ -24,6 +24,7 @@ export function registerIpc(service, windows, configUis) {
         case 'history': return { ok: true, value: service.list() };
         case 'historyDetail': fail(typeof data.id === 'string' && /^[a-f0-9-]{36}$/.test(data.id), 'E_HISTORY', '历史请求 ID 无效。'); return { ok: true, value: service.snapshot(data.id) };
         case 'hide': void configUis?.close(win); win.minimize(); break;
+        case 'background': needRequest(); service.backgroundByUser(id); void configUis?.close(win); win.minimize(); break;
         case 'close': needRequest(); service.closeByUser(id); break;
         case 'dismiss': fail(service.get(id).status !== 'pending', 'E_REQUEST_PENDING', '等待中的请求请先回复或取消。'); windows.finish(id); break;
         case 'preferences': service.preferences(data); break;
