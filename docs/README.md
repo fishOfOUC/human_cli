@@ -5,7 +5,7 @@
 | 安装、CLI / MCP 基本用法与源码启动 | [项目 README](../README.md) |
 | 文件放在哪里、启动入口与历史构建归档 | [项目文件说明](PROJECT-LAYOUT.md) |
 | AI 调用参数、有序回复、附件路径与断线恢复 | [AI 接入说明](AI-INTEGRATION.md) |
-| AI 使用场景、调用规则与程序启动插件示例 | [human-cli Skill](../skills/human-cli/SKILL.md) |
+| AI 使用场景、调用规则与程序启动插件示例 | [askForUserHelp Skill](../skills/askForUserHelp/SKILL.md) |
 | 模块职责与数据流 | [架构说明](ARCHITECTURE.md) |
 | 便签创建、关闭与桌面进程退出 | [生命周期](LIFECYCLE.md) |
 | 插件能力、配置与接入步骤 | [插件开发](PLUGINS.md) |

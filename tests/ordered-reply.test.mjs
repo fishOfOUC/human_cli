@@ -157,9 +157,9 @@ test('software cache root is independent of cwd and moving software rebuilds abs
   assert.ok(newPath.startsWith(secondRoot)); assert.notEqual(newPath, oldPath);
   assert.equal(readFileSync(newPath, 'utf8'), '原始数据'); assert.ok(existsSync(oldPath));
   assert.equal(JSON.parse(readFileSync(reopened.logs().entries[0].cache.replyPath)).content[0].path, newPath);
-  const configured = process.env.HUMAN_CLI_CACHE_DIR; delete process.env.HUMAN_CLI_CACHE_DIR;
-  try { assert.equal(replyCacheDirectory({ packaged: true, executable: join(f.directory, '软件', 'human_cli-desktop.exe') }), resolve(f.directory, '软件', 'cache')); }
-  finally { if (configured !== undefined) process.env.HUMAN_CLI_CACHE_DIR = configured; }
+  const configured = process.env.ASK_FOR_USER_HELP_CACHE_DIR; delete process.env.ASK_FOR_USER_HELP_CACHE_DIR;
+  try { assert.equal(replyCacheDirectory({ packaged: true, executable: join(f.directory, '软件', 'askForUserHelp-desktop.exe') }), resolve(f.directory, '软件', 'cache')); }
+  finally { if (configured !== undefined) process.env.ASK_FOR_USER_HELP_CACHE_DIR = configured; }
 });
 
 test('legacy records migrate known text/image order and default HTTP returns tiny path-only replies for large images', async (t) => {

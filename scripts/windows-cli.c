@@ -42,19 +42,19 @@ static BOOL WINAPI interrupt(DWORD event) {
 int wmain(int argc, wchar_t **argv) {
   wchar_t executable[CAPACITY], script[CAPACITY];
   DWORD count = GetModuleFileNameW(NULL, executable, CAPACITY);
-  if (!count || count >= CAPACITY - 100) { fputs("E_PATH: Cannot locate human_cli.exe.\n", stderr); return 2; }
+  if (!count || count >= CAPACITY - 100) { fputs("E_PATH: Cannot locate askForUserHelp.exe.\n", stderr); return 2; }
   wchar_t *separator = wcsrchr(executable, L'\\');
   if (!separator) return 2;
   separator[1] = 0;
   wcscpy(script, executable);
-  wcscat(executable, L"human_cli-desktop.exe");
+  wcscat(executable, L"askForUserHelp-desktop.exe");
   const BOOL mcp = argc > 1 && wcscmp(argv[1], L"mcp") == 0;
   wcscat(script, mcp ? L"resources\\app\\adapters\\mcp.mjs" : L"resources\\app\\adapters\\cli.mjs");
   if (GetFileAttributesW(executable) == INVALID_FILE_ATTRIBUTES || GetFileAttributesW(script) == INVALID_FILE_ATTRIBUTES) {
-    fputs("E_INSTALL: Keep human_cli.exe beside human_cli-desktop.exe and the resources directory.\n", stderr); return 2;
+    fputs("E_INSTALL: Keep askForUserHelp.exe beside askForUserHelp-desktop.exe and the resources directory.\n", stderr); return 2;
   }
   if (!SetEnvironmentVariableW(L"ELECTRON_RUN_AS_NODE", L"1")) return 2;
-  if (!GetEnvironmentVariableW(L"HUMAN_CLI_DESKTOP_EXE", NULL, 0)) SetEnvironmentVariableW(L"HUMAN_CLI_DESKTOP_EXE", executable);
+  if (!GetEnvironmentVariableW(L"ASK_FOR_USER_HELP_DESKTOP_EXE", NULL, 0)) SetEnvironmentVariableW(L"ASK_FOR_USER_HELP_DESKTOP_EXE", executable);
   argument(executable); argument(script);
   for (int i = mcp ? 2 : 1; i < argc; ++i) argument(argv[i]);
   STARTUPINFOW startup = {0}; PROCESS_INFORMATION child = {0};

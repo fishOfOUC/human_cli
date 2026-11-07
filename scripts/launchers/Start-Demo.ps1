@@ -1,3 +1,3 @@
-﻿$ErrorActionPreference = 'Stop'
-& (Join-Path $PSScriptRoot 'Start-human_cli.ps1')
+$ErrorActionPreference = 'Stop'
+& (Join-Path $PSScriptRoot 'Start-askForUserHelp.ps1')
 exit $LASTEXITCODE

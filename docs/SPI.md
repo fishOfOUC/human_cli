@@ -1,4 +1,4 @@
-# human_cli SPI v1 线协议
+# askForUserHelp SPI v1 线协议
 
 这是语言无关的服务提供者接口。传输使用 HTTP POST，消息遵循 [JSON-RPC 2.0](https://www.jsonrpc.org/specification)。不要求特定 SDK；可使用任意语言的 HTTP/JSON 实现。
 
@@ -9,7 +9,7 @@
 - 每条请求携带 `jsonrpc: "2.0"`、唯一 `id`、`method` 和对象 `params`。
 - 响应回显同一个 id，只包含 result 或 error 之一。
 - 参考服务只处理单条请求，不要求批量 JSON-RPC；不使用 WebSocket、反向回调或浏览器 CORS。
-- human_cli 不跟随端点重定向，避免把令牌转发到另一个服务。
+- askForUserHelp 不跟随端点重定向，避免把令牌转发到另一个服务。
 
 ## 发现
 
@@ -90,7 +90,7 @@ text 最多 100000 字符，最多 8 个附件；每个附件 name/mime/data 必
 ## 取消和释放
 
 - `spi.cancel({runId})`：尽力停止指定作业，返回 runId 和当前 state。
-- `spi.forget({runId})`：human_cli 已复制最终结果或终止运行后，释放记录，返回 `{"forgotten":true}`。不要释放仍在运行的作业。
+- `spi.forget({runId})`：askForUserHelp 已复制最终结果或终止运行后，释放记录，返回 `{"forgotten":true}`。不要释放仍在运行的作业。
 
 没有在 SPI 中设置人类操作期限。每个 HTTP 调用的故障检测期限不等于作业期限；一次慢作业可在多次 status 调用之间持续运行。网络分区后取消不能保证已送达，提供者需要管理作业资源及孤立任务。
 
@@ -112,6 +112,6 @@ text 最多 100000 字符，最多 8 个附件；每个附件 name/mime/data 必
 
 - `examples/spi-python/provider.py`：独立 Python 标准库实现，支持配置、异步任务、取消、中文及二进制附件。
 - `plugins/spi-server.mjs`：Node 参考服务器，可通过 startSpiServer({ plugins, execute }) 提供任意业务。
-- `plugins/network-host.mjs`：human_cli 网络客户端与目录校验。
+- `plugins/network-host.mjs`：askForUserHelp 网络客户端与目录校验。
 
-远程服务运行在自己的机器上。它不会因为接入 human_cli 就自动拥有桌面端的屏幕或剪贴板；这些本机能力由内置的本机提供者实现。接入服务应受信任，远程传输建议使用 HTTPS。
+远程服务运行在自己的机器上。它不会因为接入 askForUserHelp 就自动拥有桌面端的屏幕或剪贴板；这些本机能力由内置的本机提供者实现。接入服务应受信任，远程传输建议使用 HTTPS。

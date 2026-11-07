@@ -15,7 +15,7 @@ function renderEditor() {
   if (count > local.attachmentCount) local.replyHeight = Math.max(local.replyHeight, Math.min(320, 100 + count * 90));
   local.attachmentCount = count; render();
 }
-$('#app').innerHTML = `<main class="note-window" aria-label="AI 协助便签"><header class="window-titlebar"><div class="window-identity">${icon('sticky-note')}<span id="agent-name">human_cli</span></div><div class="window-controls"><button class="icon-button pin-control" data-action="pin" aria-label="切换置顶" title="切换置顶">${icon('pin')}</button><button class="icon-button" data-action="hide" aria-label="最小化到任务栏" title="最小化到任务栏，AI 请求继续等待">${icon('minus')}</button><button class="icon-button close-control" data-action="close" aria-label="关闭此请求" title="关闭此请求并通知 AI，不提交回复">${icon('x')}</button></div></header><div class="note-body"></div>${['n','s','e','w','ne','nw','se','sw'].map(edge => `<div class="resize-edge ${edge}" data-resize-edge="${edge}" aria-hidden="true"></div>`).join('')}<div class="note-toast" role="status" aria-live="polite"></div></main>`;
+$('#app').innerHTML = `<main class="note-window" aria-label="AI 协助便签"><header class="window-titlebar"><div class="window-identity">${icon('sticky-note')}<span id="agent-name">askForUserHelp</span></div><div class="window-controls"><button class="icon-button pin-control" data-action="pin" aria-label="切换置顶" title="切换置顶">${icon('pin')}</button><button class="icon-button" data-action="hide" aria-label="最小化到任务栏" title="最小化到任务栏，AI 请求继续等待">${icon('minus')}</button><button class="icon-button close-control" data-action="close" aria-label="关闭此请求" title="关闭此请求并通知 AI，不提交回复">${icon('x')}</button></div></header><div class="note-body"></div>${['n','s','e','w','ne','nw','se','sw'].map(edge => `<div class="resize-edge ${edge}" data-resize-edge="${edge}" aria-hidden="true"></div>`).join('')}<div class="note-toast" role="status" aria-live="polite"></div></main>`;
 
 function toast(text) {
   clearTimeout(toastTimer); $('.note-toast').textContent = text; $('.note-toast').classList.add('visible');
@@ -52,7 +52,7 @@ function render() {
   const oldPane = $('#shared-panel')?.dataset.pane, scroll = $('.pane-scroll')?.scrollTop || 0;
   const request = state.request ? { ...state.request, content: editor.blocks, checks: local.checks } : null;
   renderNoteBody($('.note-body'), `${railHTML(request, 'left', local.pane)}<article class="paper" id="shared-panel" role="region" aria-label="便签与工具详情" data-pane="${esc(local.pane)}">${panelHTML({ ...state, request }, local)}</article>${railHTML(request, 'right', local.pane)}`, request?.id, local.pane);
-  $('#agent-name').textContent = request?.agent || 'human_cli';
+  $('#agent-name').textContent = request?.agent || 'askForUserHelp';
   $('.pin-control').innerHTML = icon(state.preferences.pinned ? 'pin' : 'pin-off');
   $('.pin-control').setAttribute('aria-pressed', String(state.preferences.pinned));
   refreshIcons();
@@ -318,7 +318,7 @@ for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) docume
 new ResizeObserver(() => requestAnimationFrame(syncConfigBounds)).observe($('.note-window'));
 refreshIcons();
 if (!bridge) {
-  $('.note-body').innerHTML = '<article class="paper"><div class="pane-scroll empty-note"><h1>请从桌面端打开 human_cli。</h1><p>运行 npm start，或双击“启动 human_cli.cmd”。AI 调用 MCP 后会自动出现协助便签。</p></div></article>';
+  $('.note-body').innerHTML = '<article class="paper"><div class="pane-scroll empty-note"><h1>请从桌面端打开 askForUserHelp。</h1><p>运行 npm start，或双击“启动 askForUserHelp.cmd”。AI 调用 MCP 后会自动出现协助便签。</p></div></article>';
 } else {
   bridge.onState(receive);
   bridge.onCloseRequest(() => execute(closeRequest));

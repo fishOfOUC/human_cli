@@ -10,7 +10,7 @@
 
 新增验证：用户等待不创建期限定时器，模拟一天离开仍保留请求。真实 MCP 客户端超时、断开后，新客户端调用 human_logs，不依赖原 requestId 就能找到回复文件，自行读取 UTF-8 文字及原始图片。无需回执，工具目录不含 human_ack。
 
-更名兼容验证包括 HUMAN_CLI_DATA_DIR 优先、旧 RELAY_DATA_DIR 与 RelayNote 数据目录回退、内置插件 ID 和默认配置迁移。
+更名兼容验证包括 ASK_FOR_USER_HELP_DATA_DIR 优先、旧 RELAY_DATA_DIR 与 RelayNote 数据目录回退、内置插件 ID 和默认配置迁移。
 
 缓存验证包括按创建时间排序及分页、绝对路径、便签与回复 JSON、附件字节一致、重启重建丢失缓存、旧回执数据迁移保留、丢弃后删除回复文件与无引用图片、保留请求日志及独立工具结果。多张大图分页，每页控制在 MCP 默认缓冲限制内。
 
@@ -30,7 +30,7 @@
 
 提供 `npm run test:native`。它启动专用临时数据目录的真实 Electron，测试原生置顶、窗口尺寸、AI 请求触发窗口、真实截图、preload IPC、右键结果、主题广播与保存、图片上传、MCP 图片回传、窗口几何记忆以及收起不取消。
 
-测试只操作 human_cli 自己的 DOM 和窗口，不发送全局鼠标或键盘输入；会进行一次真实屏幕截图。生成的报告与截图保存在忽略的 `.qa/native-*/` 下，测试截图不进入发布包或 Git。
+测试只操作 askForUserHelp 自己的 DOM 和窗口，不发送全局鼠标或键盘输入；会进行一次真实屏幕截图。生成的报告与截图保存在忽略的 `.qa/native-*/` 下，测试截图不进入发布包或 Git。
 
 真实 Windows 原生验收：25 项通过，报告为 `.qa/native-f2e5225e/report.json`。覆盖真实屏幕 PNG、截图隐藏/恢复、图片上传/粘贴/拖入 IPC、MCP 四张图片回传、日志及缓存文件、主题与置顶、窗口几何记忆、最小化恢复、并行任务及结束窗口销毁。旧“回复已保存”和丢弃结果页已按新生命周期移除，不再作为界面验收项；缓存丢弃与删除能力仍有领域测试覆盖。
 
@@ -42,9 +42,9 @@ Windows 在 125% 缩放下的物理像素 / DIP 取整会造成少量尺寸偏�
 
 ## 便携包
 
-Windows x64 便携包使用真实 MCP 客户端调用包内适配器，自动启动打包后的 `human_cli-desktop.exe`，通过网络 SPI 查询到 4 个内置插件，并完成创建 / 即时查询 pending / AI 取消 / 日志定位缓存文件，未手动提前打开桌面端。对应验收脚本为 `tests/autostart-smoke.mjs`；结果写入 `.qa/autostart-*/acceptance.json`。每次更新打包后运行此检查，并对 core、desktop、plugins、adapters、dist、docs、examples 与包内文件做 SHA256 一致性核对。
+Windows x64 便携包使用真实 MCP 客户端调用包内适配器，自动启动打包后的 `askForUserHelp-desktop.exe`，通过网络 SPI 查询到 4 个内置插件，并完成创建 / 即时查询 pending / AI 取消 / 日志定位缓存文件，未手动提前打开桌面端。对应验收脚本为 `tests/autostart-smoke.mjs`；结果写入 `.qa/autostart-*/acceptance.json`。每次更新打包后运行此检查，并对 core、desktop、plugins、adapters、dist、docs、examples 与包内文件做 SHA256 一致性核对。
 
-当前本地预览原生 EXE 入口验收通过 20 项，脚本为 tests/packaged-cli-smoke.mjs，报告为 `.qa/cli-中文 空格-mAmTW6/acceptance.json`：清空子进程 PATH，在含中文和空格的发布路径运行帮助、错误退出码、JSON 文件/标准输入、get/list/logs/result、wait/cancel、参数引号和反斜杠，并通过 human_cli.exe mcp 连接真实 MCP SDK。测试驱动本身使用 Node，受测 CLI/MCP 不依赖系统 Node。
+当前本地预览原生 EXE 入口验收通过 20 项，脚本为 tests/packaged-cli-smoke.mjs，报告为 `.qa/cli-中文 空格-mAmTW6/acceptance.json`：清空子进程 PATH，在含中文和空格的发布路径运行帮助、错误退出码、JSON 文件/标准输入、get/list/logs/result、wait/cancel、参数引号和反斜杠，并通过 askForUserHelp.exe mcp 连接真实 MCP SDK。测试驱动本身使用 Node，受测 CLI/MCP 不依赖系统 Node。
 
 另在实际 PowerShell 中验证 EXE 输出可通过 ConvertFrom-Json 管道解析，成功返回 0、未知命令返回 1。启动器导入表仅依赖 Windows 自带 KERNEL32.dll、msvcrt.dll。
 
@@ -82,7 +82,7 @@ Windows x64 便携包使用真实 MCP 客户端调用包内适配器，自动启
 
 ## v2 有序回复与路径附件（2026-10-29）
 
-默认回复改为 schemaVersion=1、有序 content[]，图片与普通文件只交付缓存绝对路径。回复缓存默认在软件目录/cache，状态及原始附件仍使用原数据目录；测试通过 HUMAN_CLI_CACHE_DIR 隔离缓存，不触碰日常数据。
+默认回复改为 schemaVersion=1、有序 content[]，图片与普通文件只交付缓存绝对路径。回复缓存默认在软件目录/cache，状态及原始附件仍使用原数据目录；测试通过 ASK_FOR_USER_HELP_CACHE_DIR 隔离缓存，不触碰日常数据。
 
 - 81 项核心/适配器/编辑模型测试通过，日志 `.qa/response-tests-final.log`。新增文字/图片/文件/诊断穿插、异步上传乱序、失败重试与阻止提交、空文件和同名文件、附件归属、完成失败回滚、旧记录迁移、软件目录移动后路径重建、CLI/MCP 一致性及显式 legacy 兼容。
 - 10 项真实有序回复验收：`.qa/ordered-reply-2674107c/report.json`。通过受测 Electron WebContents 向真实编辑器派发粘贴/拖放/按钮事件，经 preload/IPC 和真实存储，验证“文 → 图 → 文 → 文件 → 文”、上移下移、损坏图片阻止完成、CLI/MCP JSON 完全一致及路径原始字节可读。浅色和深色截图已检查；不操作系统鼠标或键盘。
@@ -129,5 +129,5 @@ Windows x64 便携包使用真实 MCP 客户端调用包内适配器，自动启
 
 - `npm test` 93 项通过，`npm run build` 通过；日志分别为 `.qa/github-submit-tests.log`、`.qa/github-submit-build.log`。静态图标从 `public/` 正常复制到构建目录。
 - 有序回复与关闭控件原生检查 17 项通过：`.qa/ordered-reply-ffba269a/report.json`；实际进程生命周期检查 12 项通过：`.qa/lifecycle-6d725dd0/report.json`。
-- `skills/human-cli/` 格式检查通过，12 段 JSON 示例可解析，MCP/CLI 请求示例通过实际契约校验。启动提供者经真实 HTTP SPI、NetworkPluginHost 与 RequestService 验证 7 项通过：`.qa/skill-launch-cf2555af/report.json`。使用隔离目录及后台测试子程序，未声称验证交互窗口的视觉表现。
+- `skills/askForUserHelp/` 格式检查通过，12 段 JSON 示例可解析，MCP/CLI 请求示例通过实际契约校验。启动提供者经真实 HTTP SPI、NetworkPluginHost 与 RequestService 验证 7 项通过：`.qa/skill-launch-cf2555af/report.json`。使用隔离目录及后台测试子程序，未声称验证交互窗口的视觉表现。
 - 11 个历史原型文件迁移至 `archive/prototype/` 后，与 Git 原版本对象逐字节一致；`public/favicon.svg` 同样一致。迁移后的 PowerShell 启动脚本语法检查通过，未执行会打开日常应用的启动脚本。

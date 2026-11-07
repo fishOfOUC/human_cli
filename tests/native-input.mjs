@@ -6,9 +6,9 @@ import assert from 'node:assert/strict';
 
 const output = resolve('.qa', `input-${Date.now()}`);
 mkdirSync(output, { recursive: true });
-process.env.HUMAN_CLI_DATA_DIR = join(output, 'data');
-process.env.HUMAN_CLI_CACHE_DIR = join(output, 'cache');
-process.env.HUMAN_CLI_TEST_HIDDEN = '1';
+process.env.ASK_FOR_USER_HELP_DATA_DIR = join(output, 'data');
+process.env.ASK_FOR_USER_HELP_CACHE_DIR = join(output, 'cache');
+process.env.ASK_FOR_USER_HELP_TEST_HIDDEN = '1';
 const checks = [], errors = [];
 const sleep = ms => new Promise(done => setTimeout(done, ms));
 const check = (name, value) => { assert.ok(value, name); checks.push(name); console.log(`PASS ${name}`); };
@@ -21,7 +21,7 @@ async function until(fn) {
 async function run() {
   try {
     const desktop = await import('../desktop/main.mjs'); await desktop.ready;
-    const runtime = JSON.parse(readFileSync(join(process.env.HUMAN_CLI_DATA_DIR, 'runtime.json')));
+    const runtime = JSON.parse(readFileSync(join(process.env.ASK_FOR_USER_HELP_DATA_DIR, 'runtime.json')));
     const api = async (path, method = 'GET', body) => {
       const response = await fetch(runtime.url + path, { method, headers: { Authorization: `Bearer ${runtime.token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
       const value = await response.json(); assert.ok(response.ok, JSON.stringify(value)); return value;

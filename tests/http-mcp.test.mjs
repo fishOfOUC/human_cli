@@ -24,8 +24,8 @@ test('one normal MCP human_request waits through user drafting and returns the c
   const { service, directory } = fixture(t), api = await startApi(service);
   t.after(() => new Promise((r) => api.server.close(r)));
   writeFileSync(join(directory, 'runtime.json'), JSON.stringify({ url: api.url, token: api.token }));
-  const transport = new StdioClientTransport({ command: process.execPath, args: [fileURLToPath(new URL('../adapters/mcp.mjs', import.meta.url))], env: { ...process.env, HUMAN_CLI_DATA_DIR: directory, HUMAN_CLI_NO_AUTOSTART: '1' }, stderr: 'pipe' });
-  const client = new Client({ name: 'human-cli-integration-test', version: '1' });
+  const transport = new StdioClientTransport({ command: process.execPath, args: [fileURLToPath(new URL('../adapters/mcp.mjs', import.meta.url))], env: { ...process.env, ASK_FOR_USER_HELP_DATA_DIR: directory, ASK_FOR_USER_HELP_NO_AUTOSTART: '1' }, stderr: 'pipe' });
+  const client = new Client({ name: 'askForUserHelp-integration-test', version: '1' });
   await client.connect(transport); t.after(() => client.close());
   const tools = await client.listTools(); assert.equal(tools.tools.length, 8);
   assert.ok(!tools.tools.some((t) => t.name === 'human_ack'));
@@ -71,7 +71,7 @@ test('MCP client timeout recovers reply using logs and local files without origi
   writeFileSync(join(directory, 'runtime.json'), JSON.stringify({ url: api.url, token: api.token }));
   const connect = async () => {
     const client = new Client({ name: 'reconnecting-client', version: '1' });
-    await client.connect(new StdioClientTransport({ command: process.execPath, args: [fileURLToPath(new URL('../adapters/mcp.mjs', import.meta.url))], env: { ...process.env, HUMAN_CLI_DATA_DIR: directory, HUMAN_CLI_NO_AUTOSTART: '1' }, stderr: 'pipe' }));
+    await client.connect(new StdioClientTransport({ command: process.execPath, args: [fileURLToPath(new URL('../adapters/mcp.mjs', import.meta.url))], env: { ...process.env, ASK_FOR_USER_HELP_DATA_DIR: directory, ASK_FOR_USER_HELP_NO_AUTOSTART: '1' }, stderr: 'pipe' }));
     t.after(() => client.close()); return client;
   };
   const first = await connect();
@@ -101,7 +101,7 @@ test('strict nulls, plugin JSON text and old object calls work over real MCP wit
   t.after(() => { api.server.closeAllConnections(); return new Promise((done) => api.server.close(done)); });
   writeFileSync(join(directory, 'runtime.json'), JSON.stringify({ url: api.url, token: api.token }));
   const client = new Client({ name: 'strict-compatibility-test', version: '1' });
-  await client.connect(new StdioClientTransport({ command: process.execPath, args: [fileURLToPath(new URL('../adapters/mcp.mjs', import.meta.url))], env: { ...process.env, HUMAN_CLI_DATA_DIR: directory, HUMAN_CLI_NO_AUTOSTART: '1' }, stderr: 'pipe' }));
+  await client.connect(new StdioClientTransport({ command: process.execPath, args: [fileURLToPath(new URL('../adapters/mcp.mjs', import.meta.url))], env: { ...process.env, ASK_FOR_USER_HELP_DATA_DIR: directory, ASK_FOR_USER_HELP_NO_AUTOSTART: '1' }, stderr: 'pipe' }));
   t.after(() => client.close());
   const definition = (await client.listTools()).tools.find((tool) => tool.name === 'human_request');
   const config = { delayMs: 0, display: 'primary', autoAttach: false };
@@ -139,7 +139,7 @@ test('real MCP accepts client empty-string placeholders and returns an explicit 
   t.after(() => { api.server.closeAllConnections(); return new Promise((done) => api.server.close(done)); });
   writeFileSync(join(directory, 'runtime.json'), JSON.stringify({ url: api.url, token: api.token }));
   const client = new Client({ name: 'empty-confirmation-client', version: '1' });
-  await client.connect(new StdioClientTransport({ command: process.execPath, args: [fileURLToPath(new URL('../adapters/mcp.mjs', import.meta.url))], env: { ...process.env, HUMAN_CLI_DATA_DIR: directory, HUMAN_CLI_NO_AUTOSTART: '1' }, stderr: 'pipe' }));
+  await client.connect(new StdioClientTransport({ command: process.execPath, args: [fileURLToPath(new URL('../adapters/mcp.mjs', import.meta.url))], env: { ...process.env, ASK_FOR_USER_HELP_DATA_DIR: directory, ASK_FOR_USER_HELP_NO_AUTOSTART: '1' }, stderr: 'pipe' }));
   t.after(() => client.close());
   const args = { title: '不填写直接确认', agent: '', idempotencyKey: '', format: '', plugins: [] };
   const waiting = client.callTool({ name: 'human_request', arguments: args });

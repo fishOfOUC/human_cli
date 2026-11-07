@@ -17,8 +17,8 @@ import { ConfigUiManager } from './config-ui.mjs';
 import { OnDemandLifecycle } from './lifecycle.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-app.setName('human_cli'); app.setPath('userData', dataDirectory());
-protocol.registerSchemesAsPrivileged([{ scheme: 'human-cli-app', privileges: { standard: true, secure: true, supportFetchAPI: true } }, { scheme: 'human-cli-asset', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
+app.setName('askForUserHelp'); app.setPath('userData', dataDirectory());
+protocol.registerSchemesAsPrivileged([{ scheme: 'ask-for-user-help-app', privileges: { standard: true, secure: true, supportFetchAPI: true } }, { scheme: 'ask-for-user-help-asset', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 export let ready;
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
@@ -37,7 +37,7 @@ else {
   const host = await new NetworkPluginHost([{ id: 'human.builtin', url: builtinProvider.url, token: builtinProvider.token }, ...configured]).initialize();
   host.loadErrors.push(...legacy.loadErrors, ...(configError ? [configError] : []));
   const service = new RequestService(store, attachments, host, { cacheDirectory: replyCacheDirectory({ packaged: app.isPackaged }) });
-  protocol.handle('human-cli-app', (request) => {
+  protocol.handle('ask-for-user-help-app', (request) => {
     const url = new URL(request.url);
     if (url.hostname !== 'ui') return new Response('Not found', { status: 404 });
     const file = resolve(join(root, 'dist'), `.${decodeURIComponent(url.pathname)}`);
@@ -45,16 +45,16 @@ else {
     if (rel.startsWith('..') || isAbsolute(rel) || !existsSync(file)) return new Response('Not found', { status: 404 });
     return net.fetch(pathToFileURL(file).href);
   });
-  protocol.handle('human-cli-asset', (request) => {
+  protocol.handle('ask-for-user-help-asset', (request) => {
     try {
       const url = new URL(request.url), id = url.pathname.slice(1);
       if (url.hostname !== 'attachment' || !/^[a-f0-9-]{36}$/.test(id)) throw new Error();
       const item = attachments.get(id);
-      return new Response(attachments.bytes(id), { headers: { 'Content-Type': item.mime, 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': 'human-cli-app://ui' } });
+      return new Response(attachments.bytes(id), { headers: { 'Content-Type': item.mime, 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': 'ask-for-user-help-app://ui' } });
     } catch { return new Response('Not found', { status: 404 }); }
   });
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => callback({ responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': ["default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' human-cli-asset: data:; connect-src 'self' human-cli-asset:; object-src 'none'; frame-src 'none'"] } }));
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => callback({ responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': ["default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' ask-for-user-help-asset: data:; connect-src 'self' ask-for-user-help-asset:; object-src 'none'; frame-src 'none'"] } }));
   const configUis = new ConfigUiManager(service);
   const lifecycle = new OnDemandLifecycle(() => service.list().some((r) => r.status === 'pending'), () => app.quit());
   registerIpc(service, windows, configUis);

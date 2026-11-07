@@ -1,5 +1,5 @@
 {
-  "name": "human_cli",
+  "name": "askForUserHelp",
   "version": "2.0.3",
   "private": true,
   "type": "module",
@@ -41,10 +41,10 @@
   "description": "把用户包装成可调用的工具，帮助 AI 完成人机协作任务。",
   "repository": {
     "type": "git",
-    "url": "https://github.com/fishOfOUC/human_cli.git"
+    "url": "https://github.com/fishOfOUC/askForUserHelp.git"
   },
-  "homepage": "https://github.com/fishOfOUC/human_cli#readme",
+  "homepage": "https://github.com/fishOfOUC/askForUserHelp#readme",
   "bugs": {
-    "url": "https://github.com/fishOfOUC/human_cli/issues"
+    "url": "https://github.com/fishOfOUC/askForUserHelp/issues"
   }
 }

@@ -54,6 +54,6 @@ export class AttachmentStore {
   }
   get(id) { const item = this.store.data.attachments[id]; fail(item, 'E_ATTACHMENT', '附件不存在。', 404); return item; }
   bytes(id) { const a = this.get(id); fail(this.isManagedFile(a.file), 'E_ATTACHMENT_PATH', '无效的附件存储位置。'); return readFileSync(join(this.root, a.file)); }
-  view(item) { const { file, ...metadata } = item; return { ...metadata, url: `human-cli-asset://attachment/${item.id}` }; }
+  view(item) { const { file, ...metadata } = item; return { ...metadata, url: `ask-for-user-help-asset://attachment/${item.id}` }; }
   forRequest(id, requestId) { const item = this.get(id); fail(item.requestId === requestId, 'E_ATTACHMENT_OWNER', '附件不属于该请求。'); return item; }
 }

@@ -20,7 +20,7 @@ process.on('message', async ({ id, action, requestId, text }) => {
     else if (action === 'minimize') { win.minimize(); value = true; }
     else if (action === 'restore') { win.restore(); value = true; }
     else if (action === 'resize') { win.setBounds({ ...win.getBounds(), width: 420, height: 390 }); value = { bounds: win.getBounds(), scaleFactor: screen.getDisplayMatching(win.getBounds()).scaleFactor }; }
-    else if (action === 'capture') { writeFileSync(join(process.env.HUMAN_CLI_DATA_DIR, '..', 'pending-note.png'), (await win.webContents.capturePage()).toPNG()); value = true; }
+    else if (action === 'capture') { writeFileSync(join(process.env.ASK_FOR_USER_HELP_DATA_DIR, '..', 'pending-note.png'), (await win.webContents.capturePage()).toPNG()); value = true; }
     else throw new Error('Unknown native test action');
     process.send?.({ id, value });
   } catch (error) { process.send?.({ id, error: error.message }); }

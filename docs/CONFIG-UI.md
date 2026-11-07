@@ -24,7 +24,7 @@ spi.describe 中的插件清单增加可选 configUi：
 
 configUi 为 {"type":"none"} 时没有配置界面；右键仅显示结果及“无需配置”提示，不显示空表单或保存设置按钮。仍需声明空的 configSchema 对象，例如 {"type":"object","properties":{},"additionalProperties":false}。
 
-configUi 缺省或 type=schema：由 human_cli 生成现有表单。type=web：提供者还需实现本文四个 SPI 方法，并自行提供 HTML、JS、CSS 以及页面所需的 HTTP API。configSchema 仍然用于宿主校验，不能因为有网页而省略。
+configUi 缺省或 type=schema：由 askForUserHelp 生成现有表单。type=web：提供者还需实现本文四个 SPI 方法，并自行提供 HTML、JS、CSS 以及页面所需的 HTTP API。configSchema 仍然用于宿主校验，不能因为有网页而省略。
 
 path 是同提供者 origin 的绝对路径，不含查询参数、片段或凭据。配置页面及资源由提供者自己托管；不要求特定前端框架或后端语言。
 

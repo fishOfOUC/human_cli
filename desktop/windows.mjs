@@ -18,15 +18,15 @@ export class WindowManager {
     let restoring = true;
     const win = new BrowserWindow({
       ...bounds, minWidth: 340, minHeight: 300, frame: false, transparent: true, resizable: true, thickFrame: false,
-      alwaysOnTop: this.store.data.preferences.pinned, show: false, backgroundColor: '#00000000', title: 'human_cli 接力便签',
+      alwaysOnTop: this.store.data.preferences.pinned, show: false, backgroundColor: '#00000000', title: 'askForUserHelp 接力便签',
       webPreferences: { preload: join(this.root, 'desktop', 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true },
     });
     win.requestId = requestId; this.windows.set(key, win);
     // Applying DIP bounds explicitly avoids Windows' initial frameless sizing adjustment.
     win.setBounds(bounds);
-    win.loadURL(`human-cli-app://ui/index.html${requestId ? `?request=${requestId}` : ''}`);
+    win.loadURL(`ask-for-user-help-app://ui/index.html${requestId ? `?request=${requestId}` : ''}`);
     win.once('ready-to-show', () => {
-      if (process.env.HUMAN_CLI_TEST_HIDDEN !== '1') win.showInactive();
+      if (process.env.ASK_FOR_USER_HELP_TEST_HIDDEN !== '1') win.showInactive();
       // Windows may adjust the initial frame on the first DPI-aware show. Correct
       // the observed delta; do not persist that transient OS adjustment as a resize.
       let requested = { ...bounds };
@@ -45,7 +45,7 @@ export class WindowManager {
     win.on('blur', () => this.syncPinned(win));
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     win.webContents.on('will-navigate', (event) => event.preventDefault());
-    win.on('close', (event) => { if (!this.quitting) { event.preventDefault(); win.webContents.send('human-cli:close-request'); } });
+    win.on('close', (event) => { if (!this.quitting) { event.preventDefault(); win.webContents.send('ask-for-user-help:close-request'); } });
     win.on('closed', () => { clearTimeout(saveTimer); this.windows.delete(key); });
     let saveTimer;
     const persistGeometry = () => {

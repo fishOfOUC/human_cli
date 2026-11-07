@@ -13,7 +13,7 @@ async function setup(t, apiFactory = startApi) {
   t.after(() => { api.server.closeAllConnections(); return new Promise((done) => api.server.close(done)); });
   writeFileSync(join(f.directory, 'runtime.json'), JSON.stringify({ url: api.url, token: api.token }));
   const run = (args, input) => {
-    const child = spawn(process.execPath, [fileURLToPath(new URL('../adapters/cli.mjs', import.meta.url)), ...args], { env: { ...process.env, HUMAN_CLI_DATA_DIR: f.directory, HUMAN_CLI_NO_AUTOSTART: '1' }, stdio: 'pipe' });
+    const child = spawn(process.execPath, [fileURLToPath(new URL('../adapters/cli.mjs', import.meta.url)), ...args], { env: { ...process.env, ASK_FOR_USER_HELP_DATA_DIR: f.directory, ASK_FOR_USER_HELP_NO_AUTOSTART: '1' }, stdio: 'pipe' });
     let stdout = '', stderr = '', settled = false;
     child.stdout.setEncoding('utf8').on('data', (value) => { stdout += value; });
     child.stderr.setEncoding('utf8').on('data', (value) => { stderr += value; });
@@ -29,7 +29,7 @@ test('a lost creation response retries with the same idempotency key and creates
   const keys = [];
   const { service, run } = await setup(t, async (service) => {
     const server = createServer(async (req, res) => {
-      if (req.url === '/health') { res.end(JSON.stringify({ name: 'human_cli' })); return; }
+      if (req.url === '/health') { res.end(JSON.stringify({ name: 'askForUserHelp' })); return; }
       const chunks = []; for await (const chunk of req) chunks.push(chunk);
       const input = JSON.parse(Buffer.concat(chunks).toString()); keys.push(input.idempotencyKey);
       const request = service.create(input);

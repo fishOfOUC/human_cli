@@ -8,7 +8,7 @@ import { requestHuman, waitForHuman } from './human.mjs';
 import { projectReply, legacySnapshot } from './reply.mjs';
 import { createMcpInputContract } from './mcp-schema.mjs';
 
-const server = new McpServer({ name: 'human_cli', version: '2.0.3' });
+const server = new McpServer({ name: 'askForUserHelp', version: '2.0.3' });
 const requestId = z.string().uuid().describe('请求 UUID，使用创建请求返回的 requestId。');
 const text = (value) => ({ type: 'text', text: JSON.stringify(value, null, 2) });
 const publicTools = [];
@@ -16,7 +16,7 @@ const register = (name, description, shape, handler) => {
   const contract = createMcpInputContract(shape);
   publicTools.push({ name, description, inputSchema: contract.inputSchema });
   return server.registerTool(name, { description, inputSchema: contract.validation }, async (input, extra) => {
-    try { return await handler(input, extra); } catch (error) { return { isError: true, content: [text({ code: error.code || 'E_HUMAN_CLI', message: error.message, ...(error.requestId ? { requestId: error.requestId, cache: error.cache } : {}) })] }; }
+    try { return await handler(input, extra); } catch (error) { return { isError: true, content: [text({ code: error.code || 'E_ASK_FOR_USER_HELP', message: error.message, ...(error.requestId ? { requestId: error.requestId, cache: error.cache } : {}) })] }; }
   });
 };
 async function replyContent(request, imageOffset = 0, signal, format = 'json') {

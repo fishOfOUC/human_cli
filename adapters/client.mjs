@@ -14,14 +14,14 @@ async function connect() {
     const runtime = JSON.parse(readFileSync(runtimePath(), 'utf8'));
     if (!/^http:\/\/127\.0\.0\.1:\d+$/.test(runtime.url)) return null;
     const health = await fetch(`${runtime.url}/health`, { headers: { Authorization: `Bearer ${runtime.token}` }, signal: AbortSignal.timeout(1500) });
-    return health.ok && (await health.json()).name === 'human_cli' ? runtime : null;
+    return health.ok && (await health.json()).name === 'askForUserHelp' ? runtime : null;
   } catch { return null; }
 }
 export async function ensureDesktop() {
   const current = await connect(); if (current) return current;
   if (!starting) starting = (async () => {
-    if (process.env.HUMAN_CLI_NO_AUTOSTART === '1') throw new Error('human_cli 桌面端未运行，请先启动。');
-    const packaged = process.env.HUMAN_CLI_DESKTOP_EXE;
+    if ((process.env.ASK_FOR_USER_HELP_NO_AUTOSTART || process.env.HUMAN_CLI_NO_AUTOSTART) === '1') throw new Error('askForUserHelp 桌面端未运行，请先启动。');
+    const packaged = process.env.ASK_FOR_USER_HELP_DESKTOP_EXE || process.env.HUMAN_CLI_DESKTOP_EXE;
     if (!packaged && !existsSync(join(root, 'dist', 'index.html'))) throw new Error('界面尚未构建，请先在项目目录运行 npm run build。');
     let executable = packaged;
     if (!executable) {

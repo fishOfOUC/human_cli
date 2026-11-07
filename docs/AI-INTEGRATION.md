@@ -1,23 +1,23 @@
 # AI 接入与本地缓存
 
-human_cli 按需启动，没有主界面或托盘。用户完成、AI 取消或用户主动关闭后便签立即消失，最后一个任务结束、响应传完后桌面端自动退出；下次 CLI/MCP 调用会重新启动。查询历史只返回数据，不显示历史窗口。
+askForUserHelp 按需启动，没有主界面或托盘。用户完成、AI 取消或用户主动关闭后便签立即消失，最后一个任务结束、响应传完后桌面端自动退出；下次 CLI/MCP 调用会重新启动。查询历史只返回数据，不显示历史窗口。
 
-human_cli 不设置用户完成协助的截止时间。用户长时间离开、客户端超时或 AI 退出时，请求与回复仍保存在本机。AI 自己判断工具调用是否成功；不需要额外发送接收回执。
+askForUserHelp 不设置用户完成协助的截止时间。用户长时间离开、客户端超时或 AI 退出时，请求与回复仍保存在本机。AI 自己判断工具调用是否成功；不需要额外发送接收回执。
 
 ## MCP 配置
 
 ```json
 {
   "mcpServers": {
-    "human_cli": {
-      "command": "E:/你的便携目录/human_cli.exe",
+    "askForUserHelp": {
+      "command": "E:/你的便携目录/askForUserHelp.exe",
       "args": ["mcp"]
     }
   }
 }
 ```
 
-便携包直接使用 human_cli.exe，无需安装 Node.js，也不需要指定源码、端点或令牌。它会按需自动启动同目录的 human_cli-desktop.exe。
+便携包直接使用 askForUserHelp.exe，无需安装 Node.js，也不需要指定源码、端点或令牌。它会按需自动启动同目录的 askForUserHelp-desktop.exe。
 
 开发环境仍可配置 command 为 node，args 指向本仓库 adapters/mcp.mjs；开发前执行 npm install 和 npm run build。
 
@@ -94,7 +94,7 @@ human_request 和 human_wait 都不提供用户完成超时参数。客户端宿
 
 ```json
 {
-  "cacheDirectory": "E:/Tools/human_cli/cache",
+  "cacheDirectory": "E:/Tools/askForUserHelp/cache",
   "total": 1,
   "entries": [{
     "id": "请求UUID",
@@ -105,9 +105,9 @@ human_request 和 human_wait 都不提供用户完成超时参数。客户端宿
     "cache": {
       "state": "saved",
       "savedAt": "2026-10-28T08:05:00.000Z",
-      "directory": "E:/Tools/human_cli/cache/请求UUID",
-      "requestPath": "E:/Tools/human_cli/cache/请求UUID/request.json",
-      "replyPath": "E:/Tools/human_cli/cache/请求UUID/reply.json"
+      "directory": "E:/Tools/askForUserHelp/cache/请求UUID",
+      "requestPath": "E:/Tools/askForUserHelp/cache/请求UUID/request.json",
+      "replyPath": "E:/Tools/askForUserHelp/cache/请求UUID/reply.json"
     }
   }],
   "nextOffset": null
@@ -129,23 +129,23 @@ AI 根据标题和时间找到原便签，直接读取 replyPath；其中 image/
       <attachmentId>.png
 ```
 
-回复缓存默认位于 human_cli.exe 所在软件目录/cache，源码运行时在项目根目录/cache，不使用调用者工作目录。HUMAN_CLI_CACHE_DIR 可显式指定其他缓存根目录（测试使用）；HUMAN_CLI_DATA_DIR 只影响状态、原始附件和配置。缓存目录不可写时明确报错，不静默切换位置。每张便签创建及后续变更都会更新 request.json，用户完成后原子写入仅含精简对外回复的 reply.json。附件复制到便签自己的目录，不依赖正在运行的图片 URL。重启时根据持久状态重建缓存，旧版回复按“文字 → 原图片顺序 → 原诊断顺序”迁移，原来未记录的穿插位置无法还原。软件目录移动后重新查询可获得按新位置生成的路径；原缓存源保留。
+回复缓存默认位于 askForUserHelp.exe 所在软件目录/cache，源码运行时在项目根目录/cache，不使用调用者工作目录。ASK_FOR_USER_HELP_CACHE_DIR 可显式指定其他缓存根目录（测试使用）；ASK_FOR_USER_HELP_DATA_DIR 只影响状态、原始附件和配置。缓存目录不可写时明确报错，不静默切换位置。每张便签创建及后续变更都会更新 request.json，用户完成后原子写入仅含精简对外回复的 reply.json。附件复制到便签自己的目录，不依赖正在运行的图片 URL。重启时根据持久状态重建缓存，旧版回复按“文字 → 原图片顺序 → 原诊断顺序”迁移，原来未记录的穿插位置无法还原。软件目录移动后重新查询可获得按新位置生成的路径；原缓存源保留。
 
 所有回复统一保存，不尝试通过连接状态推断 AI 是否接收成功。成功调用、重复读取均不删除文件；当前无自动过期策略。用户可以在便签中明确丢弃缓存回复，删除 reply.json、回复内容和不再被工具结果引用的附件，日志保留 discarded 标记及请求记录。丢弃不能撤回 AI 已经读取的内容。
 
 ## 非 MCP 脚本
 
 ```powershell
-./human_cli.exe request ./resources/app/examples/request.json
+./askForUserHelp.exe request ./resources/app/examples/request.json
 # 这一条命令默认等到用户完成，再返回回复。
-./human_cli.exe logs 50 0
-./human_cli.exe result <请求ID>
+./askForUserHelp.exe logs 50 0
+./askForUserHelp.exe result <请求ID>
 ```
 
 CLI request 默认等待用户完成；只有 --background 明确后台创建并立即返回 ID。wait <ID> 用于恢复等待已有任务。还支持 get、cancel、list、plugins；--help 显示用法。默认结果包含 schemaVersion、requestId、status 与有序 content；空提交 content=[] 并附 submission.type=confirmation_only 的系统说明，取消不发送草稿，丢弃时返回 replyState=discarded 并省略 content。旧调用者可显式使用 --format legacy 或 MCP format=legacy，图片分页也只在 legacy 下保留；legacy 无法无损表达穿插。request - 从标准输入读取 UTF-8 JSON，最终输出写入 stdout，等待开始的 waiting_for_user 元数据和错误写入 stderr；错误返回非零退出码。
 
 HTTP 接口为 `GET /logs?limit=50&offset=0`，使用现有本机 Bearer 认证。日志接口不读取调用者指定的任意路径，仅返回工具管理的缓存位置。
 
-默认数据目录 `%LOCALAPPDATA%/human_cli`；适配器和桌面端应使用相同 HUMAN_CLI_DATA_DIR。runtime.json 含访问令牌，不是可分享配置。HUMAN_CLI_NO_AUTOSTART=1 可关闭自动启动。
+默认数据目录 `%LOCALAPPDATA%/askForUserHelp`；适配器和桌面端应使用相同 ASK_FOR_USER_HELP_DATA_DIR。runtime.json 含访问令牌，不是可分享配置。ASK_FOR_USER_HELP_NO_AUTOSTART=1 可关闭自动启动。
 
-缓存路径指向运行 human_cli 的机器。AI 若运行在另一台机器，需要自己已有的文件访问方式；human_cli 不会自动暴露文件到公网，也不会向已经结束的 AI 会话主动注入消息。
+缓存路径指向运行 askForUserHelp 的机器。AI 若运行在另一台机器，需要自己已有的文件访问方式；askForUserHelp 不会自动暴露文件到公网，也不会向已经结束的 AI 会话主动注入消息。

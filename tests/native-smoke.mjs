@@ -11,8 +11,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 const output = resolve('.qa', `native-${randomUUID().slice(0, 8)}`);
-mkdirSync(output, { recursive: true }); process.env.HUMAN_CLI_DATA_DIR = join(output, 'data');
-process.env.HUMAN_CLI_CACHE_DIR = join(output, 'cache');
+mkdirSync(output, { recursive: true }); process.env.ASK_FOR_USER_HELP_DATA_DIR = join(output, 'data');
+process.env.ASK_FOR_USER_HELP_CACHE_DIR = join(output, 'cache');
 const checks = [], errors = [];
 const check = (name, value) => { assert.ok(value, name); checks.push(name); console.log(`PASS ${name}`); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -27,7 +27,7 @@ async function runAcceptance() {
 try {
   const desktop = await import('../desktop/main.mjs');
   await desktop.ready;
-  const runtime = JSON.parse(readFileSync(join(process.env.HUMAN_CLI_DATA_DIR, 'runtime.json'), 'utf8'));
+  const runtime = JSON.parse(readFileSync(join(process.env.ASK_FOR_USER_HELP_DATA_DIR, 'runtime.json'), 'utf8'));
   const api = async (path, method = 'GET', body) => {
     const response = await fetch(runtime.url + path, { method, headers: { Authorization: `Bearer ${runtime.token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
     const result = await response.json(); if (!response.ok) throw new Error(JSON.stringify(result)); return result;
@@ -63,7 +63,7 @@ try {
   await js(win, 'document.querySelector("[data-pane=settings]").click()');
   await js(win, 'document.querySelector("[data-theme=dark]").click()');
   await until(() => js(win, 'document.documentElement.dataset.theme==="dark"'));
-  check('Dark theme applies and persists', JSON.parse(readFileSync(join(process.env.HUMAN_CLI_DATA_DIR, 'state.json'), 'utf8')).preferences.theme === 'dark');
+  check('Dark theme applies and persists', JSON.parse(readFileSync(join(process.env.ASK_FOR_USER_HELP_DATA_DIR, 'state.json'), 'utf8')).preferences.theme === 'dark');
   await js(win, 'document.querySelector(".pin-control").click()'); await until(() => !win.isAlwaysOnTop());
   check('Pin toggle changes the native always-on-top flag', !win.isAlwaysOnTop());
   await js(win, 'document.querySelector(".pin-control").click()'); await until(() => win.isAlwaysOnTop());
@@ -85,12 +85,12 @@ try {
   await until(async () => (await api(`/requests/${request.id}`)).tools[1].state === 'success');
   check('Environment plugin produces real OS and display data', (await api(`/requests/${request.id}`)).tools[1].output.text.includes('displays'));
   client = new Client({ name: 'native-acceptance', version: '1' });
-  const mcpTransport = new StdioClientTransport({ command: 'node', args: [resolve('adapters/mcp.mjs')], env: { ...process.env, HUMAN_CLI_NO_AUTOSTART: '1' }, stderr: 'pipe' });
+  const mcpTransport = new StdioClientTransport({ command: 'node', args: [resolve('adapters/mcp.mjs')], env: { ...process.env, ASK_FOR_USER_HELP_NO_AUTOSTART: '1' }, stderr: 'pipe' });
   mcpTransport.stderr?.on('data', (chunk) => console.error(`MCP STDERR: ${chunk}`));
   await client.connect(mcpTransport);
   const waiting = client.callTool({ name: 'human_wait', arguments: { requestId: request.id } });
   win.setBounds({ ...win.getBounds(), x: win.getBounds().x - 30, width: 410, height: 390 }); await sleep(350);
-  const remembered = JSON.parse(readFileSync(join(process.env.HUMAN_CLI_DATA_DIR, 'state.json'), 'utf8')).geometry.bounds;
+  const remembered = JSON.parse(readFileSync(join(process.env.ASK_FOR_USER_HELP_DATA_DIR, 'state.json'), 'utf8')).geometry.bounds;
   check('Native move and resize are persisted on a stable DPI grid', Math.abs(remembered.width - win.getBounds().width) <= 2 && Math.abs(remembered.height - win.getBounds().height) <= 2);
   await js(win, 'document.querySelector("[data-action=complete]").click()');
   const result = await waiting;
@@ -118,7 +118,7 @@ try {
   const offlineSaved = await api(`/requests/${offline.id}`);
   check('Disconnected reply is saved before its note disappears', offlineSaved.cache.state === 'saved' && JSON.parse(readFileSync(offlineSaved.cache.replyPath, 'utf8')).content[0].text === '这份回复先保存在本机');
   let cliClosed = false, cliOutput = '', cliError = '';
-  cliProcess = spawn(process.execPath, [resolve('adapters/cli.mjs'), 'request', '-'], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', HUMAN_CLI_NO_AUTOSTART: '1' }, stdio: 'pipe' });
+  cliProcess = spawn(process.execPath, [resolve('adapters/cli.mjs'), 'request', '-'], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', ASK_FOR_USER_HELP_NO_AUTOSTART: '1' }, stdio: 'pipe' });
   cliProcess.stdout.setEncoding('utf8').on('data', (chunk) => { cliOutput += chunk; });
   cliProcess.stderr.setEncoding('utf8').on('data', (chunk) => { cliError += chunk; });
   const cliFinished = new Promise((resolveResult, reject) => { cliProcess.once('error', reject); cliProcess.once('close', (code) => { cliClosed = true; resolveResult(code); }); });

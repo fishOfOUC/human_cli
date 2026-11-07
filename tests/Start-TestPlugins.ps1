@@ -8,7 +8,7 @@ if (!$PreviewDirectory) {
             try {
                 $pointer = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
                 foreach ($directory in $pointer.directories) {
-                    if ((Test-Path -LiteralPath (Join-Path $directory 'human_cli.exe')) -and (Test-Path -LiteralPath (Join-Path $directory 'human_cli-desktop.exe'))) { $directory }
+                    if ((Test-Path -LiteralPath (Join-Path $directory 'askForUserHelp.exe')) -and (Test-Path -LiteralPath (Join-Path $directory 'askForUserHelp-desktop.exe'))) { $directory }
                 }
             } catch { }
         }
@@ -17,12 +17,12 @@ if (!$PreviewDirectory) {
     $PreviewDirectory = $candidates | Sort-Object -Descending -Unique | Select-Object -First 1
 }
 if (!$PreviewDirectory) { throw '请先在项目根目录运行 npm run package，或通过 -PreviewDirectory 指定本地构建目录。' }
-$cli = Join-Path $PreviewDirectory 'human_cli.exe'
-$desktop = Join-Path $PreviewDirectory 'human_cli-desktop.exe'
+$cli = Join-Path $PreviewDirectory 'askForUserHelp.exe'
+$desktop = Join-Path $PreviewDirectory 'askForUserHelp-desktop.exe'
 if (!(Test-Path -LiteralPath $cli) -or !(Test-Path -LiteralPath $desktop)) { throw '请先准备含配置界面功能的本地预览版。' }
 $run = Join-Path $repo ('.qa/acceptance-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $run -Force | Out-Null
-$oldData = $env:HUMAN_CLI_DATA_DIR
+$oldData = $env:ASK_FOR_USER_HELP_DATA_DIR
 $oldNode = $env:ELECTRON_RUN_AS_NODE
 try {
     $env:ELECTRON_RUN_AS_NODE = '1'
@@ -45,12 +45,12 @@ try {
     $requestPath = Join-Path $run 'request.json'
     [IO.File]::WriteAllText($requestPath, ($request | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
     [IO.File]::WriteAllText((Join-Path $repo '.qa/acceptance-current.json'), (@{runDirectory=$run;previewDirectory=$PreviewDirectory;providerPid=$provider.Id} | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
-    $env:HUMAN_CLI_DATA_DIR = Join-Path $run 'data'
+    $env:ASK_FOR_USER_HELP_DATA_DIR = Join-Path $run 'data'
     Write-Host "验收环境：$run"
     Write-Host 'CLI 将持续等待你的回复。完成后便签消失，桌面端与测试服务自动退出。'
     & $cli request $requestPath
     if ($LASTEXITCODE -ne 0) { throw "CLI 返回错误：$LASTEXITCODE" }
 } finally {
-    $env:HUMAN_CLI_DATA_DIR = $oldData
+    $env:ASK_FOR_USER_HELP_DATA_DIR = $oldData
     $env:ELECTRON_RUN_AS_NODE = $oldNode
 }

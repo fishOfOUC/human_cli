@@ -13,10 +13,10 @@
 | `scripts/` | 打包工具、原生 CLI 启动器 C 源码与 `launchers/` 开发启动脚本 |
 | `tests/` | 自动验证、三个测试插件、独立验收服务与预览启动脚本 |
 | `examples/` | 请求、插件与独立 Python SPI 服务示例 |
-| `skills/human-cli/` | 随项目维护的 AI 使用 Skill、MCP/CLI 参考和程序启动插件示例 |
+| `skills/askForUserHelp/` | 随项目维护的 AI 使用 Skill、MCP/CLI 参考和程序启动插件示例 |
 | `docs/` | 接入协议、架构、界面约定与验证说明；从 [文档索引](README.md) 查找 |
 | `archive/prototype/` | 历史原型和用户提供的重构原稿，仅供参考 |
-| `启动 human_cli.cmd` | 从源码构建并启动应用 |
+| `启动 askForUserHelp.cmd` | 从源码构建并启动应用 |
 | `查看界面.cmd` | 根目录的本地界面验收入口 |
 | `release/` | 本地构建记录、当前使用的构建和历史发布包，详见下文 |
 | `cache/` | 本机请求与回复缓存，保留原位置以便 AI 按绝对路径读取 |
@@ -26,7 +26,7 @@
 
 从源码首次查看界面：
 
-开发环境需要 Node.js 22.12 或更新版本；Windows 打包需要 MinGW-w64 GCC，也可用 `HUMAN_CLI_CC` 指定编译器路径。便携包使用者不需要这些开发工具。
+开发环境需要 Node.js 22.12 或更新版本；Windows 打包需要 MinGW-w64 GCC，也可用 `ASK_FOR_USER_HELP_CC` 指定编译器路径。便携包使用者不需要这些开发工具。
 
 ```powershell
 npm ci

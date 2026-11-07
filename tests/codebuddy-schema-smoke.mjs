@@ -34,7 +34,7 @@ function inspect(tools) {
 const report = { bundle: resolve(bundle), bundleSha256: createHash('sha256').update(source).digest('hex'), codebuddyVersion: JSON.parse(readFileSync(resolve(bundle, '../../package.json'))).version, before: beforePath ? inspect(JSON.parse(readFileSync(beforePath))) : undefined, connections: [] };
 for (let attempt = 0; attempt < 3; attempt++) {
   const client = new Client({ name: 'codebuddy-schema-probe', version: '1' });
-  const transport = new StdioClientTransport({ command: process.execPath, args: [resolve(process.env.HUMAN_CLI_MCP_ENTRY || 'adapters/mcp.mjs')], env: { ...process.env, HUMAN_CLI_NO_AUTOSTART: '1' }, stderr: 'pipe' });
+  const transport = new StdioClientTransport({ command: process.execPath, args: [resolve(process.env.ASK_FOR_USER_HELP_MCP_ENTRY || 'adapters/mcp.mjs')], env: { ...process.env, ASK_FOR_USER_HELP_NO_AUTOSTART: '1' }, stderr: 'pipe' });
   await client.connect(transport);
   try {
     for (let refresh = 0; refresh < 2; refresh++) {

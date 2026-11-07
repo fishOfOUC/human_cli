@@ -8,8 +8,8 @@ import { PluginHost } from '../plugins/host.mjs';
 import { RequestService } from '../core/requests.mjs';
 export const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==', 'base64');
 export function fixture(t, capabilities = {}, options = {}) {
-  const directory = mkdtempSync(join(tmpdir(), 'human-cli-test-'));
-  t.after(() => { if (!resolve(directory).startsWith(resolve(tmpdir(), 'human-cli-test-'))) throw new Error('Unsafe test cleanup'); rmSync(directory, { recursive: true, force: true }); });
+  const directory = mkdtempSync(join(tmpdir(), 'ask-for-user-help-test-'));
+  t.after(() => { if (!resolve(directory).startsWith(resolve(tmpdir(), 'ask-for-user-help-test-'))) throw new Error('Unsafe test cleanup'); rmSync(directory, { recursive: true, force: true }); });
   const store = new JsonStore(directory), attachments = new AttachmentStore(store);
   const calls = [];
   const plugins = new PluginHost([fileURLToPath(new URL('../plugins/builtin', import.meta.url)), ...(options.roots || [])], {

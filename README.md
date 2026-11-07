@@ -1,17 +1,17 @@
-# human_cli
+# askForUserHelp
 
 **把用户包装成可调用的工具，配合 AI 完成工作。**
 
-AI 不方便继续操作时，例如需要人工验证、登录、观察真实界面或截图确认，可以调用 human_cli，把任务交给用户。用户收到一张小型置顶便签，完成操作后附上文字、图片或诊断，再把结果返回给 AI。
+AI 不方便继续操作时，例如需要人工验证、登录、观察真实界面或截图确认，可以调用 askForUserHelp，把任务交给用户。用户收到一张小型置顶便签，完成操作后附上文字、图片或诊断，再把结果返回给 AI。
 
 AI 负责创建、更新和取消任务；用户负责需要人参与的那一步，也可主动关闭当前请求。用户操作没有固定完成时限。应用没有主界面或托盘；AI 请求才出现便签，完成或取消后便签立即消失，最后一项任务结束、响应传完后桌面进程自动退出。
 
 ## 下载与启动
 
-从 [GitHub Releases](https://github.com/fishOfOUC/human_cli/releases/latest) 下载 Windows x64 便携包，解压整个目录。
+从 [GitHub Releases](https://github.com/fishOfOUC/askForUserHelp/releases/latest) 下载 Windows x64 便携包，解压整个目录。
 
-- `human_cli.exe`：CLI 和 MCP 入口，供 AI 或终端调用。
-- `human_cli-desktop.exe`：按需便签运行时，由 CLI 自动启动；没有任务时不显示窗口，并自动退出。
+- `askForUserHelp.exe`：CLI 和 MCP 入口，供 AI 或终端调用。
+- `askForUserHelp-desktop.exe`：按需便签运行时，由 CLI 自动启动；没有任务时不显示窗口，并自动退出。
 
 **用户无需安装 Node.js。** 两个 EXE、resources 和其他运行库必须放在同一目录，不能只复制一个 EXE。
 
@@ -20,8 +20,8 @@ AI 负责创建、更新和取消任务；用户负责需要人参与的那一�
 在便携包目录中打开 PowerShell，先检查可用功能：
 
 ```powershell
-.\human_cli.exe --help
-.\human_cli.exe plugins
+.\askForUserHelp.exe --help
+.\askForUserHelp.exe plugins
 ```
 
 创建一个 UTF-8 的 `request.json`：
@@ -45,7 +45,7 @@ AI 负责创建、更新和取消任务；用户负责需要人参与的那一�
 用一次调用请求协助并等待答复：
 
 ```powershell
-.\human_cli.exe request .\request.json
+.\askForUserHelp.exe request .\request.json
 ```
 
 这条命令会一直等待用户点击“完成并回复”，然后返回最终结果；用户还在输入时不会结束。正常使用不需要另调 wait。
@@ -53,7 +53,7 @@ AI 负责创建、更新和取消任务；用户负责需要人参与的那一�
 也可以直接运行包内示例：
 
 ```powershell
-.\human_cli.exe request .\resources\app\examples\request.json
+.\askForUserHelp.exe request .\resources\app\examples\request.json
 ```
 
 | 命令 | 用途 |
@@ -81,8 +81,8 @@ AI 负责创建、更新和取消任务；用户负责需要人参与的那一�
 ```json
 {
   "mcpServers": {
-    "human_cli": {
-      "command": "C:/Tools/human_cli/human_cli.exe",
+    "askForUserHelp": {
+      "command": "C:/Tools/askForUserHelp/askForUserHelp.exe",
       "args": ["mcp"]
     }
   }
@@ -102,7 +102,7 @@ v2.0.2 进一步兼容可选 Agent/幂等键等空串占位。用户直接空内
 便签、回复和附件统一保存在本地。AI 工具调用超时或退出，不会取消用户的任务；用户完成后便签消失，回复保存在本机缓存。AI 重启后调用日志接口：
 
 ```powershell
-.\human_cli.exe logs 50 0
+.\askForUserHelp.exe logs 50 0
 ```
 
 按标题和时间找到目标便签，读取 cache.replyPath 指向的回复 JSON，图片与文件位置在 content[].path。无需记住原来的请求 ID。没有回复时 replyPath 为 null，请先查看请求状态。
@@ -115,13 +115,13 @@ v2.0.2 进一步兼容可选 Agent/幂等键等空串占位。用户直接空内
   reply.json
   attachments/
 
-%LOCALAPPDATA%/human_cli/
+%LOCALAPPDATA%/askForUserHelp/
   state.json
   attachments/
   plugins/providers.json
 ```
 
-回复缓存默认在 human_cli.exe 同目录的 cache 下，源码运行时在项目根目录/cache；与启动时的工作目录无关。HUMAN_CLI_CACHE_DIR 可显式覆盖缓存根目录（例如隔离测试）。HUMAN_CLI_DATA_DIR 仍覆盖状态、原始附件及配置目录，不改变默认回复缓存位置。为保留改名前的数据，如果新目录尚无状态且旧 RelayNote 目录存在状态，会继续使用旧目录；旧 RELAY_DATA_DIR 也作为兼容配置接受。升级前应退出旧桌面端。读取不删除缓存；完成后不保留供用户浏览的历史窗口。缓存清理能力保留在领域层。
+回复缓存默认在 askForUserHelp.exe 同目录的 cache 下，源码运行时在项目根目录/cache；与启动时的工作目录无关。ASK_FOR_USER_HELP_CACHE_DIR 可显式覆盖缓存根目录（例如隔离测试）。ASK_FOR_USER_HELP_DATA_DIR 仍覆盖状态、原始附件及配置目录，不改变默认回复缓存位置。为保留改名前的数据，如果新目录尚无状态且旧 RelayNote 目录存在状态，会继续使用旧目录；旧 RELAY_DATA_DIR 也作为兼容配置接受。升级前应退出旧桌面端。读取不删除缓存；完成后不保留供用户浏览的历史窗口。缓存清理能力保留在领域层。
 
 ## 用户如何操作便签
 
@@ -138,7 +138,7 @@ v2.0.2 进一步兼容可选 Agent/幂等键等空串占位。用户直接空内
 
 ## AI 使用 Skill
 
-项目随附 [human-cli Skill](skills/human-cli/SKILL.md)，说明适用场景、MCP/CLI 调用、图文文件回复与断线恢复，以及如何通过插件为用户提供脚本或程序启动入口。完整目录位于 `skills/human-cli/`，含用法参考与可运行的 Python SPI 启动插件示例，可按所用 AI 客户端的规则安装或直接提供给 AI 阅读。
+项目随附 [askForUserHelp Skill](skills/askForUserHelp/SKILL.md)，说明适用场景、MCP/CLI 调用、图文文件回复与断线恢复，以及如何通过插件为用户提供脚本或程序启动入口。完整目录位于 `skills/askForUserHelp/`，含用法参考与可运行的 Python SPI 启动插件示例，可按所用 AI 客户端的规则安装或直接提供给 AI 阅读。
 
 ## 网络 SPI 插件
 
@@ -164,16 +164,16 @@ python examples/spi-python/provider.py --port 7788
 
 ## 从源码运行与构建
 
-开发环境需要 Node.js 22.12 或更新版本；Windows 发布包构建另需 MinGW-w64 GCC，可通过 HUMAN_CLI_CC 指定编译器路径。
+开发环境需要 Node.js 22.12 或更新版本；Windows 发布包构建另需 MinGW-w64 GCC，可通过 ASK_FOR_USER_HELP_CC 指定编译器路径。
 
 ```powershell
-git clone https://github.com/fishOfOUC/human_cli.git
-cd human_cli
+git clone https://github.com/fishOfOUC/askForUserHelp.git
+cd askForUserHelp
 npm ci
 npm start
 ```
 
-源码 CLI / MCP 开发入口分别为 node adapters/cli.mjs 与 node adapters/mcp.mjs，也可双击“启动 human_cli.cmd”。打包：
+源码 CLI / MCP 开发入口分别为 node adapters/cli.mjs 与 node adapters/mcp.mjs，也可双击“启动 askForUserHelp.cmd”。打包：
 
 ```powershell
 npm test

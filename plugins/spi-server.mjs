@@ -3,7 +3,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { fail, errorData } from '../core/errors.mjs';
 import { SPI_VERSION, encodeOutput } from './spi-rpc.mjs';
 
-// Reference provider implementation. human_cli clients use only its network protocol;
+// Reference provider implementation. askForUserHelp clients use only its network protocol;
 // providers in other languages implement the same five JSON-RPC methods.
 export async function startSpiServer({ plugins, execute, configUi, token = randomBytes(32).toString('hex'), port = 0, host = '127.0.0.1', retentionMs = 300000 }) {
   const jobs = new Map();

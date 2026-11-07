@@ -8,21 +8,26 @@ import { JsonStore } from '../core/store.mjs';
 import { AttachmentStore } from '../core/attachments.mjs';
 import { RequestService } from '../core/requests.mjs';
 
-test('new human_cli data path honors explicit configuration and preserves legacy notes', (t) => {
+test('new askForUserHelp data path honors explicit configuration and preserves legacy notes', (t) => {
   const { directory } = fixture(t);
-  const keys = ['HUMAN_CLI_DATA_DIR', 'RELAY_DATA_DIR', 'LOCALAPPDATA'];
+  const keys = ['ASK_FOR_USER_HELP_DATA_DIR', 'HUMAN_CLI_DATA_DIR', 'RELAY_DATA_DIR', 'LOCALAPPDATA'];
   const previous = keys.map((key) => [key, process.env[key]]);
   t.after(() => { for (const [key, value] of previous) { if (value === undefined) delete process.env[key]; else process.env[key] = value; } });
-  delete process.env.HUMAN_CLI_DATA_DIR; delete process.env.RELAY_DATA_DIR;
+  delete process.env.ASK_FOR_USER_HELP_DATA_DIR; delete process.env.HUMAN_CLI_DATA_DIR; delete process.env.RELAY_DATA_DIR;
   process.env.LOCALAPPDATA = directory;
-  assert.equal(dataDirectory(), join(directory, 'human_cli'));
+  assert.equal(dataDirectory(), join(directory, 'askForUserHelp'));
+  const previousName = join(directory, 'human_cli'); mkdirSync(previousName);
+  writeFileSync(join(previousName, 'state.json'), '{}');
+  assert.equal(dataDirectory(), previousName);
   const legacy = join(directory, 'RelayNote'); mkdirSync(legacy);
   writeFileSync(join(legacy, 'state.json'), '{}');
-  assert.equal(dataDirectory(), legacy);
+  assert.equal(dataDirectory(), previousName);
   process.env.RELAY_DATA_DIR = join(directory, 'old-config');
   assert.equal(dataDirectory(), process.env.RELAY_DATA_DIR);
-  process.env.HUMAN_CLI_DATA_DIR = join(directory, 'new-config');
+  process.env.HUMAN_CLI_DATA_DIR = join(directory, 'previous-config');
   assert.equal(dataDirectory(), process.env.HUMAN_CLI_DATA_DIR);
+  process.env.ASK_FOR_USER_HELP_DATA_DIR = join(directory, 'new-config');
+  assert.equal(dataDirectory(), process.env.ASK_FOR_USER_HELP_DATA_DIR);
 });
 
 test('renamed built-in plugins retain previous request bindings and saved configurations', (t) => {

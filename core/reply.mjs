@@ -9,7 +9,7 @@ export function projectReply(request, { background = false } = {}) {
   if (request.status === 'cancelled' && request.cancelledBy === 'user') reply.cancelledBy = 'user';
   if (request.cache?.state === 'discarded') return { ...reply, replyState: 'discarded' };
   if (request.status === 'completed') {
-    if (!Array.isArray(request.result?.content)) throw Object.assign(new Error('桌面端未提供有序回复，请在现有任务结束后重启到新版 human_cli；原回复仍可通过 get/logs 查询。'), { code: 'E_REPLY_VERSION', requestId: request.id });
+    if (!Array.isArray(request.result?.content)) throw Object.assign(new Error('桌面端未提供有序回复，请在现有任务结束后重启到新版 askForUserHelp；原回复仍可通过 get/logs 查询。'), { code: 'E_REPLY_VERSION', requestId: request.id });
     reply.content = request.result.content.filter(hasReplyContent).map((b) => {
       if (b.type === 'text') return { type: 'text', text: b.text };
       if (b.attachmentId) {

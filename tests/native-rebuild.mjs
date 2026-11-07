@@ -9,12 +9,12 @@ import { resizeFromEdge, resizeEdges } from '../desktop/geometry.mjs';
 import { png } from './helpers.mjs';
 
 const output = resolve('.qa', `rebuild-${randomUUID().slice(0, 8)}`);
-process.env.HUMAN_CLI_DATA_DIR = join(output, 'data');
-process.env.HUMAN_CLI_CACHE_DIR = join(output, 'cache');
-process.env.HUMAN_CLI_TEST_HIDDEN = '1';
-mkdirSync(join(process.env.HUMAN_CLI_DATA_DIR, 'plugins'), { recursive: true });
+process.env.ASK_FOR_USER_HELP_DATA_DIR = join(output, 'data');
+process.env.ASK_FOR_USER_HELP_CACHE_DIR = join(output, 'cache');
+process.env.ASK_FOR_USER_HELP_TEST_HIDDEN = '1';
+mkdirSync(join(process.env.ASK_FOR_USER_HELP_DATA_DIR, 'plugins'), { recursive: true });
 const provider = await startAcceptanceProvider();
-writeFileSync(join(process.env.HUMAN_CLI_DATA_DIR, 'plugins/providers.json'), JSON.stringify({ version: 1, providers: [{ id: 'acceptance', url: provider.url, token: provider.token }] }));
+writeFileSync(join(process.env.ASK_FOR_USER_HELP_DATA_DIR, 'plugins/providers.json'), JSON.stringify({ version: 1, providers: [{ id: 'acceptance', url: provider.url, token: provider.token }] }));
 const desktop = await import('../desktop/main.mjs');
 const checks = [], errors = [];
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
@@ -24,7 +24,7 @@ async function run() {
   try {
     await desktop.ready;
     check('No home window was introduced by the UI migration', BrowserWindow.getAllWindows().length === 0);
-    const runtime = JSON.parse(readFileSync(join(process.env.HUMAN_CLI_DATA_DIR, 'runtime.json'), 'utf8'));
+    const runtime = JSON.parse(readFileSync(join(process.env.ASK_FOR_USER_HELP_DATA_DIR, 'runtime.json'), 'utf8'));
     const api = async (path, method = 'GET', body) => {
       const response = await fetch(runtime.url + path, { method, headers: { Authorization: `Bearer ${runtime.token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
       const data = await response.json(); assert.ok(response.ok, JSON.stringify(data)); return data;
@@ -92,7 +92,7 @@ async function run() {
     await js('document.querySelector("#nav-settings").click()');
     await js('document.querySelector("[data-action=motion]").click()');
     await until(() => js('document.documentElement.classList.contains("motion-off")'));
-    check('Motion switch persists a real preference', JSON.parse(readFileSync(join(process.env.HUMAN_CLI_DATA_DIR, 'state.json'), 'utf8')).preferences.motion === false);
+    check('Motion switch persists a real preference', JSON.parse(readFileSync(join(process.env.ASK_FOR_USER_HELP_DATA_DIR, 'state.json'), 'utf8')).preferences.motion === false);
     const capture = async (name) => { await until(() => js('!document.querySelector(".note-toast").classList.contains("visible")')); await js('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))'); await sleep(60); const image = await win.webContents.capturePage(); writeFileSync(join(output, name), image.toPNG()); return image; };
     for (const theme of ['light', 'paper', 'sage', 'dark']) {
       await js(`document.querySelector('[data-theme=${theme}]').click();document.querySelector('#nav-note').click()`);

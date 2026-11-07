@@ -1,4 +1,4 @@
-"""Local human_cli SPI launcher example; Python 3 standard library only.
+"""Local askForUserHelp SPI launcher example; Python 3 standard library only.
 
 Targets are configured at startup. Launch success is a handoff to the user,
 not evidence that the external program or requested manual task succeeded.
@@ -20,7 +20,7 @@ def load_task(filename):
     source = Path(filename).resolve()
     task = json.loads(source.read_text(encoding="utf-8-sig"))
     if not re.fullmatch(r"[a-z][a-z0-9.-]{0,127}", task.get("pluginId", "")):
-        raise ValueError("pluginId must be a valid human_cli plugin ID")
+        raise ValueError("pluginId must be a valid askForUserHelp plugin ID")
     if not isinstance(task.get("name"), str) or not 1 <= len(task["name"]) <= 60:
         raise ValueError("name must contain 1 to 60 characters")
     program = task.get("program")
@@ -136,7 +136,7 @@ def main():
     parser.add_argument("--port", type=int, default=7790)
     args = parser.parse_args()
     launcher = Launcher(load_task(args.task))
-    token = os.environ.get("HUMAN_CLI_SPI_TOKEN") or secrets.token_urlsafe(32)
+    token = os.environ.get("ASK_FOR_USER_HELP_SPI_TOKEN") or secrets.token_urlsafe(32)
 
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self):

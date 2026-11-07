@@ -6,11 +6,11 @@ import { resolve, join } from 'node:path';
 import assert from 'node:assert/strict';
 const directory = mkdtempSync(resolve('.qa/autostart-'));
 const executable = process.argv[2];
-assert.ok(executable, 'Pass absolute packaged human_cli-desktop.exe path');
+assert.ok(executable, 'Pass absolute packaged askForUserHelp-desktop.exe path');
 const client = new Client({ name: 'autostart-acceptance', version: '1' });
 let runtime;
 try {
-  await client.connect(new StdioClientTransport({ command: process.execPath, args: [process.argv[3] || resolve('adapters/mcp.mjs')], env: { ...process.env, HUMAN_CLI_DATA_DIR: directory, HUMAN_CLI_DESKTOP_EXE: executable, HUMAN_CLI_NO_AUTOSTART: '0' }, stderr: 'pipe' }));
+  await client.connect(new StdioClientTransport({ command: process.execPath, args: [process.argv[3] || resolve('adapters/mcp.mjs')], env: { ...process.env, ASK_FOR_USER_HELP_DATA_DIR: directory, ASK_FOR_USER_HELP_DESKTOP_EXE: executable, ASK_FOR_USER_HELP_NO_AUTOSTART: '0' }, stderr: 'pipe' }));
   const plugins = await client.callTool({ name: 'human_plugins', arguments: {} });
   assert.ok(!plugins.isError, JSON.stringify(plugins));
   assert.equal(JSON.parse(plugins.content[0].text).length, 4);

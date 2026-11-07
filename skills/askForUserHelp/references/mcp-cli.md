@@ -2,15 +2,15 @@
 
 ## 入口配置
 
-便携包解压后保留整个目录：`human_cli.exe` 是 CLI/MCP 入口，`human_cli-desktop.exe` 是按需桌面运行时。使用者无需安装 Node.js。不要只复制一个 EXE。
+便携包解压后保留整个目录：`askForUserHelp.exe` 是 CLI/MCP 入口，`askForUserHelp-desktop.exe` 是按需桌面运行时。使用者无需安装 Node.js。不要只复制一个 EXE。
 
 MCP 客户端配置示例（用实际软件目录替换示例路径）：
 
 ```json
 {
   "mcpServers": {
-    "human_cli": {
-      "command": "E:/Tools/human_cli/human_cli.exe",
+    "askForUserHelp": {
+      "command": "E:/Tools/askForUserHelp/askForUserHelp.exe",
       "args": ["mcp"]
     }
   }
@@ -115,7 +115,7 @@ patch 仅支持上述六类字段。省略或 null 表示不修改，空字符�
 使用实际的 EXE 绝对路径。下面示例在 PowerShell 中运行：
 
 ```powershell
-$HumanCli = 'E:\Tools\human_cli\human_cli.exe'
+$HumanCli = 'E:\Tools\askForUserHelp\askForUserHelp.exe'
 & $HumanCli --help
 & $HumanCli plugins
 ```
@@ -182,14 +182,14 @@ CLI 没有 `update` 子命令，更新说明使用 MCP `human_update`。错误�
       "type":"image",
       "attachmentId":"5979f4d0-d945-4cb9-8daf-b1581614818f",
       "name":"全屏截图.png","mimeType":"image/png","size":12345,
-      "path":"E:/Tools/human_cli/cache/28b45b5c-aefc-48fa-b38d-facaa611ff50/attachments/5979f4d0-d945-4cb9-8daf-b1581614818f.png"
+      "path":"E:/Tools/askForUserHelp/cache/28b45b5c-aefc-48fa-b38d-facaa611ff50/attachments/5979f4d0-d945-4cb9-8daf-b1581614818f.png"
     },
     {"type":"text","text":"这是当前配置文件。"},
     {
       "type":"file",
       "attachmentId":"1120ce2e-0535-4727-9493-7b7f2e12abb7",
       "name":"settings.ini","mimeType":"application/octet-stream","size":256,
-      "path":"E:/Tools/human_cli/cache/28b45b5c-aefc-48fa-b38d-facaa611ff50/attachments/1120ce2e-0535-4727-9493-7b7f2e12abb7.ini"
+      "path":"E:/Tools/askForUserHelp/cache/28b45b5c-aefc-48fa-b38d-facaa611ff50/attachments/1120ce2e-0535-4727-9493-7b7f2e12abb7.ini"
     }
   ]
 }
@@ -201,4 +201,4 @@ CLI 没有 `update` 子命令，更新说明使用 MCP `human_update`。错误�
 
 缓存布局为软件目录下 `cache/<requestId>/request.json`、`reply.json` 和 `attachments/`。`request.json` 是完整快照，含草稿；`reply.json` 是完成后的精简回复。以 logs 返回的实际路径为准，文件使用 UTF-8。默认结果无 Base64 或单独 MCP 图片块；`format = legacy` / `--format legacy` 仅用于旧调用者，会丢失文字附件的穿插表达，新任务使用 json。
 
-`HUMAN_CLI_CACHE_DIR` 可改变缓存根目录；`HUMAN_CLI_DATA_DIR` 改变状态/原始附件/配置目录，默认通常为 `%LOCALAPPDATA%/human_cli`。旧 RelayNote 数据可能沿用旧目录，检查实际安装环境，不能仅凭默认值覆盖原配置。不同客户端应指向相同数据目录。不要把含访问令牌的 `runtime.json` 当成可分享的接入配置。
+`ASK_FOR_USER_HELP_CACHE_DIR` 可改变缓存根目录；`ASK_FOR_USER_HELP_DATA_DIR` 改变状态/原始附件/配置目录，默认通常为 `%LOCALAPPDATA%/askForUserHelp`。旧 RelayNote 数据可能沿用旧目录，检查实际安装环境，不能仅凭默认值覆盖原配置。不同客户端应指向相同数据目录。不要把含访问令牌的 `runtime.json` 当成可分享的接入配置。

@@ -6,7 +6,7 @@
 
 先调用 `human_plugins` / CLI `plugins` 检查已发现插件及 configSchema。现有内置插件为 `human.screenshot`、`human.open-url`、`human.clipboard`、`human.diagnostics`。打开网页可用 `human.open-url` 的 `url` 配置；**它不是任意程序/文件启动器**。当前没有内置的通用 `human.launch`，也没有 `ctx.exec` 或 `shell.exec` 这类声明能力，不能凭空调用。
 
-脚本或程序启动入口需要实现一个插件。新插件推荐网络 SPI：提供者在用户机器上运行独立 HTTP 服务，human_cli 按协议发现插件、显示按钮、发起作业。语言不限；接入远程提供者会操作远程机器，不能用它代替用户本机的程序启动。
+脚本或程序启动入口需要实现一个插件。新插件推荐网络 SPI：提供者在用户机器上运行独立 HTTP 服务，askForUserHelp 按协议发现插件、显示按钮、发起作业。语言不限；接入远程提供者会操作远程机器，不能用它代替用户本机的程序启动。
 
 ## 可运行的启动提供者
 
@@ -16,7 +16,7 @@
 - [launch-task.example.json](../assets/launch-task.example.json)：一个固定启动目标的配置。
 - [manual-step.ps1](../assets/manual-step.ps1)：无副作用的交互示例脚本，显示提示并等待用户回车。
 
-将这三个文件复制到稳定的本机插件目录，例如 `E:/Tools/human-cli-launcher`，将 `launch-task.example.json` 复制为 `task.json` 并修改目标。示例启动 Windows PowerShell 和同目录脚本；也可以改为 Python、某个 EXE 或其他解释器，使用参数数组：
+将这三个文件复制到稳定的本机插件目录，例如 `E:/Tools/askForUserHelp-launcher`，将 `launch-task.example.json` 复制为 `task.json` 并修改目标。示例启动 Windows PowerShell 和同目录脚本；也可以改为 Python、某个 EXE 或其他解释器，使用参数数组：
 
 ```json
 {
@@ -29,19 +29,19 @@
 }
 ```
 
-`program` 可以是绝对路径或启动提供者时 PATH 能找到的可执行文件名。包含目录的相对 program、相对 cwd 均以 **task.json 所在目录** 为基准；args 不经过 shell，也不会自动插值。使用相对脚本参数时应让 cwd 指向脚本所在目录，复杂目标优先写绝对路径。启动 `.ps1` 用 `powershell.exe`/`pwsh.exe -File`，`.py` 用 Python 解释器，不把整条命令拼成一个字符串。程序运行所需的 Python、PowerShell 或其他环境由目标机器另行提供，human_cli 不内置这些依赖。
+`program` 可以是绝对路径或启动提供者时 PATH 能找到的可执行文件名。包含目录的相对 program、相对 cwd 均以 **task.json 所在目录** 为基准；args 不经过 shell，也不会自动插值。使用相对脚本参数时应让 cwd 指向脚本所在目录，复杂目标优先写绝对路径。启动 `.ps1` 用 `powershell.exe`/`pwsh.exe -File`，`.py` 用 Python 解释器，不把整条命令拼成一个字符串。程序运行所需的 Python、PowerShell 或其他环境由目标机器另行提供，askForUserHelp 不内置这些依赖。
 
 固定目标在提供者启动时读取，AI 绑定 config 为空对象。这样模型填写按钮参数不会意外改变要执行的命令。为不同目标使用不同 pluginId/端口或将提供者扩展为多插件目录；按钮名应清楚表示实际启动对象。只交付已获用户授权的操作程序，脚本启动入口不扩大原任务范围。
 
 在本机启动服务（这一步只启动提供者，不启动操作程序）：
 
 ```powershell
-python 'E:\Tools\human-cli-launcher\launch-provider.py' --task 'E:\Tools\human-cli-launcher\task.json' --port 7790
+python 'E:\Tools\askForUserHelp-launcher\launch-provider.py' --task 'E:\Tools\askForUserHelp-launcher\task.json' --port 7790
 ```
 
-它输出一行包含 url/token 的本机连接信息，并持续运行；默认仅监听 127.0.0.1。需要固定令牌可预先设置 `HUMAN_CLI_SPI_TOKEN`。不要将令牌写进协助正文或公开日志。
+它输出一行包含 url/token 的本机连接信息，并持续运行；默认仅监听 127.0.0.1。需要固定令牌可预先设置 `ASK_FOR_USER_HELP_SPI_TOKEN`。不要将令牌写进协助正文或公开日志。
 
-在实际 human_cli 数据目录的 `plugins/providers.json` 中**合并新增**提供者，不覆盖其他条目。通常路径为 `%LOCALAPPDATA%/human_cli/plugins/providers.json`，自定义 HUMAN_CLI_DATA_DIR 或旧数据迁移环境应以实际目录为准：
+在实际 askForUserHelp 数据目录的 `plugins/providers.json` 中**合并新增**提供者，不覆盖其他条目。通常路径为 `%LOCALAPPDATA%/askForUserHelp/plugins/providers.json`，自定义 ASK_FOR_USER_HELP_DATA_DIR 或旧数据迁移环境应以实际目录为准：
 
 ```json
 {
@@ -55,7 +55,7 @@ python 'E:\Tools\human-cli-launcher\launch-provider.py' --task 'E:\Tools\human-c
 }
 ```
 
-human_cli 不自动启动外部提供者，也不热发现目录。让现有协助结束后重启桌面端，再查询插件目录，确认 `example.launch-preview` 存在。只重连 MCP 不保证重启已经运行的旧桌面端。
+askForUserHelp 不自动启动外部提供者，也不热发现目录。让现有协助结束后重启桌面端，再查询插件目录，确认 `example.launch-preview` 存在。只重连 MCP 不保证重启已经运行的旧桌面端。
 
 MCP 请求中绑定该按钮（这里只展示一个 plugins 元素，将它放进正常 human_request）：
 

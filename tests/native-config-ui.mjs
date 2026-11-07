@@ -9,11 +9,11 @@ import assert from 'node:assert/strict';
 import { startWebConfigProvider } from './fixtures/web-config-provider.mjs';
 
 const output = resolve('.qa', `config-ui-${randomUUID().slice(0, 8)}`);
-process.env.HUMAN_CLI_DATA_DIR = join(output, 'data');
-process.env.HUMAN_CLI_CACHE_DIR = join(output, 'cache');
-mkdirSync(join(process.env.HUMAN_CLI_DATA_DIR, 'plugins'), { recursive: true });
+process.env.ASK_FOR_USER_HELP_DATA_DIR = join(output, 'data');
+process.env.ASK_FOR_USER_HELP_CACHE_DIR = join(output, 'cache');
+mkdirSync(join(process.env.ASK_FOR_USER_HELP_DATA_DIR, 'plugins'), { recursive: true });
 const provider = await startWebConfigProvider();
-writeFileSync(join(process.env.HUMAN_CLI_DATA_DIR, 'plugins', 'providers.json'), JSON.stringify({ version: 1, providers: [{ id: 'test-web-config', url: provider.url, token: provider.token }] }));
+writeFileSync(join(process.env.ASK_FOR_USER_HELP_DATA_DIR, 'plugins', 'providers.json'), JSON.stringify({ version: 1, providers: [{ id: 'test-web-config', url: provider.url, token: provider.token }] }));
 const desktop = await import('../desktop/main.mjs');
 const checks = [], failures = [];
 const check = (name, value) => { assert.ok(value, name); checks.push(name); console.log(`PASS ${name}`); };
@@ -24,7 +24,7 @@ let attacker;
 async function run() {
   try {
     await desktop.ready;
-    const runtime = JSON.parse(readFileSync(join(process.env.HUMAN_CLI_DATA_DIR, 'runtime.json'), 'utf8'));
+    const runtime = JSON.parse(readFileSync(join(process.env.ASK_FOR_USER_HELP_DATA_DIR, 'runtime.json'), 'utf8'));
     const api = async (path, method = 'GET', data) => {
       const response = await fetch(runtime.url + path, { method, headers: { Authorization: `Bearer ${runtime.token}`, 'Content-Type': 'application/json' }, ...(data ? { body: JSON.stringify(data) } : {}) });
       const value = await response.json(); assert.ok(response.ok, JSON.stringify(value)); return value;
@@ -57,7 +57,7 @@ async function run() {
     await js(guest, 'document.querySelector("#settings").dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}))');
     await until(async () => (await api(`/requests/${request.id}`)).tools[0].config.label === '自定义界面保存的配置');
     await until(() => js(guest, 'document.querySelector("#message").textContent==="配置已保存"'));
-    check('Save is validated and persisted before provider displays success', JSON.parse(readFileSync(join(process.env.HUMAN_CLI_DATA_DIR, 'state.json'), 'utf8')).pluginDefaults['test.web-config'].scale === 1.5);
+    check('Save is validated and persisted before provider displays success', JSON.parse(readFileSync(join(process.env.ASK_FOR_USER_HELP_DATA_DIR, 'state.json'), 'utf8')).pluginDefaults['test.web-config'].scale === 1.5);
     check('Saving plugin configuration preserves the note reply draft', (await api(`/requests/${request.id}`)).reply === '用户的草稿');
     await guest.capturePage().then((image) => writeFileSync(join(output, 'provider-page.png'), image.toPNG()));
     await win.capturePage().then((image) => writeFileSync(join(output, 'shared-pane.png'), image.toPNG()));

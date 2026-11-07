@@ -28,7 +28,7 @@ export class ConfigUiManager extends EventEmitter {
     }
     const record = await this.sessions.open(win.id, win.requestId, toolId, { theme: this.service.store.data.preferences.theme });
     if (!this.sessions.active(record) || !record.page || win.isDestroyed() || this.views.has(win.id)) return this.snapshot(win);
-    const partition = session.fromPartition(`human-cli-config-${record.sessionId}`, { cache: false });
+    const partition = session.fromPartition(`ask-for-user-help-config-${record.sessionId}`, { cache: false });
     partition.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
     partition.setPermissionCheckHandler(() => false);
     partition.on('will-download', (event) => event.preventDefault());

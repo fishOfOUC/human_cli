@@ -8,15 +8,15 @@ export function registerIpc(service, windows, configUis) {
     for (const win of windows.windows.values()) {
       if (win.isDestroyed() || (id && win.requestId !== id) || service.get(win.requestId).status !== 'pending') continue;
       windows.syncPinned(win);
-      win.webContents.send('human-cli:state', state(win));
+      win.webContents.send('ask-for-user-help:state', state(win));
     }
   };
   service.on('change', broadcast); service.on('preferences', broadcast); service.on('connection', broadcast);
-  configUis?.on('change', (win) => { if (win && !win.isDestroyed()) win.webContents.send('human-cli:state', state(win)); });
-  ipcMain.handle('human-cli:command', async (event, { action, data = {} }) => {
+  configUis?.on('change', (win) => { if (win && !win.isDestroyed()) win.webContents.send('ask-for-user-help:state', state(win)); });
+  ipcMain.handle('ask-for-user-help:command', async (event, { action, data = {} }) => {
     try {
       const win = windows.forSender(event.sender);
-      fail(win && event.senderFrame === event.sender.mainFrame && event.senderFrame.url.startsWith('human-cli-app://ui/'), 'E_SENDER', '无效的桌面调用来源。', 403);
+      fail(win && event.senderFrame === event.sender.mainFrame && event.senderFrame.url.startsWith('ask-for-user-help-app://ui/'), 'E_SENDER', '无效的桌面调用来源。', 403);
       const id = win.requestId;
       const needRequest = () => fail(id, 'E_NO_REQUEST', '当前没有 AI 请求。');
       switch (action) {

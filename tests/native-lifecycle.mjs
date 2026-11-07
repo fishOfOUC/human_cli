@@ -8,7 +8,7 @@ import { stableBounds } from '../desktop/geometry.mjs';
 
 const output = resolve('.qa', `lifecycle-${randomUUID().slice(0, 8)}`), data = join(output, 'data');
 mkdirSync(output, { recursive: true });
-const env = { ...process.env, HUMAN_CLI_DATA_DIR: data, HUMAN_CLI_CACHE_DIR: join(output, 'cache'), HUMAN_CLI_NO_AUTOSTART: '1' }; delete env.ELECTRON_RUN_AS_NODE;
+const env = { ...process.env, ASK_FOR_USER_HELP_DATA_DIR: data, ASK_FOR_USER_HELP_CACHE_DIR: join(output, 'cache'), ASK_FOR_USER_HELP_NO_AUTOSTART: '1' }; delete env.ELECTRON_RUN_AS_NODE;
 const checks = [], check = (name, result) => { assert.ok(result, name); checks.push(name); console.log(`PASS ${name}`); };
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 async function until(fn) { for (let i = 0; i < 200; i++) { const value = await fn(); if (value) return value; await sleep(40); } throw new Error('Native lifecycle check timed out'); }

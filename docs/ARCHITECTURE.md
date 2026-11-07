@@ -1,6 +1,6 @@
-# human_cli 架构
+# askForUserHelp 架构
 
-human_cli 是由 AI 管理的人机协作工具。AI 创建、更新、取消请求；人读取说明、操作辅助工具、附图回复并完成，也可关闭当前请求。只有未完成任务显示便签；完成或取消即销毁窗口，不提供主界面、托盘或用户创建便签的入口。
+askForUserHelp 是由 AI 管理的人机协作工具。AI 创建、更新、取消请求；人读取说明、操作辅助工具、附图回复并完成，也可关闭当前请求。只有未完成任务显示便签；完成或取消即销毁窗口，不提供主界面、托盘或用户创建便签的入口。
 
 ```mermaid
 flowchart LR
@@ -25,7 +25,7 @@ flowchart LR
 | --- | --- |
 | `core/` | 请求、版本检查、便签缓存和日志、用户丢弃、附件、持久化；不依赖 Electron/MCP |
 | `adapters/` | MCP、CLI、本机 AI 接口；不执行插件代码 |
-| `scripts/windows-cli.c` | 原生 Windows 控制台入口 human_cli.exe，转发 stdin/stdout/stderr 与退出码，使用包内运行时 |
+| `scripts/windows-cli.c` | 原生 Windows 控制台入口 askForUserHelp.exe，转发 stdin/stdout/stderr 与退出码，使用包内运行时 |
 | `plugins/config-ui.mjs` | 配置界面清单、同源 URL 和提交数据校验 |
 | `plugins/ui-sessions.mjs` | 配置会话、保存冲突、持久化结果和断线恢复；不依赖 Electron |
 | `desktop/config-ui.mjs` | 隔离网页容器、共用区域布局、权限与窗口生命周期 |
@@ -36,9 +36,9 @@ flowchart LR
 | `plugins/builtin/` | 内置侧栏功能，统一暴露为本机网络 SPI |
 | `desktop/` | 按需窗口、进程生命周期、系统能力、保存文件与 IPC |
 | `src/` | 便签、主题、通用插件配置和结果、缓存/丢弃界面 |
-| `examples/spi-python/` | 无 human_cli/Node 依赖的独立 Python 提供者 |
+| `examples/spi-python/` | 无 askForUserHelp/Node 依赖的独立 Python 提供者 |
 
-渲染进程启用 context isolation 与 sandbox，不接触 Node、任意 IPC 或文件路径。主进程验证调用来源；附件通过 ID 协议读取。外部插件的代码只运行在提供者进程中，human_cli 接收清单、状态和结果。web 配置页面另在独立隔离渲染容器显示，不获得便签 preload、Node、长期令牌或全局 IPC。
+渲染进程启用 context isolation 与 sandbox，不接触 Node、任意 IPC 或文件路径。主进程验证调用来源；附件通过 ID 协议读取。外部插件的代码只运行在提供者进程中，askForUserHelp 接收清单、状态和结果。web 配置页面另在独立隔离渲染容器显示，不获得便签 preload、Node、长期令牌或全局 IPC。
 
 AI 接口与插件接口是两条不同链路。本机 AI HTTP 接口绑定 loopback 随机端口，使用随机令牌并拒绝浏览器 Origin。SPI 客户端向用户配置的提供者地址发起连接；不把本机 AI 接口暴露到外网。
 
@@ -46,7 +46,7 @@ AI 接口与插件接口是两条不同链路。本机 AI HTTP 接口绑定 loop
 
 请求状态为 pending → completed / cancelled；回复缓存状态为 not_ready → saved → discarded。没有交付确认、回执或已读状态。AI 自己判断工具调用是否成功。
 
-core/cache.mjs 默认在软件目录/cache 为每张便签维护 <requestId>/request.json，完成后将精简对外回复写入 reply.json，附件复制到同目录的 attachments 下。状态数据目录与回复缓存根目录独立，HUMAN_CLI_CACHE_DIR 可显式覆盖缓存根目录。草稿与完成快照使用有序内容块，内部保留兼容 reply/images/diagnostics 供完整查询；core/reply.mjs 统一精简投影，CLI 与 MCP 默认只返回有序内容和附件绝对路径，不编码传输图片。JSON 原子写入、UTF-8 编码，包含附件绝对路径；AI 不依赖运行中的桌面端即可读取。state.json 仍是可恢复的持久状态，启动时重建缓存并迁移旧版记录。
+core/cache.mjs 默认在软件目录/cache 为每张便签维护 <requestId>/request.json，完成后将精简对外回复写入 reply.json，附件复制到同目录的 attachments 下。状态数据目录与回复缓存根目录独立，ASK_FOR_USER_HELP_CACHE_DIR 可显式覆盖缓存根目录。草稿与完成快照使用有序内容块，内部保留兼容 reply/images/diagnostics 供完整查询；core/reply.mjs 统一精简投影，CLI 与 MCP 默认只返回有序内容和附件绝对路径，不编码传输图片。JSON 原子写入、UTF-8 编码，包含附件绝对路径；AI 不依赖运行中的桌面端即可读取。state.json 仍是可恢复的持久状态，启动时重建缓存并迁移旧版记录。
 
 human_logs / GET /logs 按创建时间倒序返回标题、时间、状态和缓存位置，支持 limit/offset 分页。AI 重启后即使不知道 requestId，也能定位自己需要的文件。为避免猜测传输是否成功，所有回复统一保存；读取不删除缓存。
 
@@ -78,7 +78,7 @@ Windows 截图使用 Electron 提供的物理显示器矩形和固定 System.Dra
 
 ## 数据
 
-默认 `%LOCALAPPDATA%\human_cli`，可用 HUMAN_CLI_DATA_DIR 覆盖。state.json 保存请求、回复、偏好和插件配置；attachments 保存原始附件；软件目录/cache 保存按便签组织的 JSON 与附件副本；plugins/providers.json 配置网络服务；runtime.json 保存本次 AI 接口地址和令牌。
+默认 `%LOCALAPPDATA%\askForUserHelp`，可用 ASK_FOR_USER_HELP_DATA_DIR 覆盖。state.json 保存请求、回复、偏好和插件配置；attachments 保存原始附件；软件目录/cache 保存按便签组织的 JSON 与附件副本；plugins/providers.json 配置网络服务；runtime.json 保存本次 AI 接口地址和令牌。
 
 目前是本机单用户、单写者的原子 JSON 存储。网络插件可以在其他机器；AI 请求通道本身尚未扩展成远程多租户服务。未实现热重载、自动安装外部服务、签名安装器或自动更新。
 
@@ -86,7 +86,7 @@ Windows 截图使用 Electron 提供的物理显示器矩形和固定 System.Dra
 
 ## 发布入口
 
-human_cli-desktop.exe 是桌面入口；human_cli.exe 是原生控制台入口，普通子命令运行包内 CLI，mcp 子命令运行包内 MCP stdio 服务。启动器通过 CreateProcessW 直接启动同目录运行时，按 Windows CRT 规则传递参数，不拼接 shell 命令，不依赖 PATH 中的 node.exe。子进程继承标准流，控制台启动器等待并返回其退出码。
+askForUserHelp-desktop.exe 是桌面入口；askForUserHelp.exe 是原生控制台入口，普通子命令运行包内 CLI，mcp 子命令运行包内 MCP stdio 服务。启动器通过 CreateProcessW 直接启动同目录运行时，按 Windows CRT 规则传递参数，不拼接 shell 命令，不依赖 PATH 中的 node.exe。子进程继承标准流，控制台启动器等待并返回其退出码。
 
 复用内置运行时依据 [Electron ELECTRON_RUN_AS_NODE](https://www.electronjs.org/docs/latest/api/environment-variables#electron_run_as_node)。开发打包使用 MinGW-w64 GCC 构建启动器，静态链接编译器支持库；用户无需安装该编译器或 Node。
 

@@ -1,5 +1,5 @@
 // Run with Node as a test driver. The tested CLI/MCP children have an empty PATH
-// and use only human_cli.exe plus the portable directory's bundled runtime.
+// and use only askForUserHelp.exe plus the portable directory's bundled runtime.
 import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync, existsSync, symlinkSync, realpathSync } from 'node:fs';
 import { resolve, join } from 'node:path';
@@ -8,14 +8,14 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 const executable = resolve(process.argv[2] || '');
-assert.ok(executable.endsWith('human_cli.exe') && existsSync(executable), 'Pass packaged human_cli.exe path');
+assert.ok(executable.endsWith('askForUserHelp.exe') && existsSync(executable), 'Pass packaged askForUserHelp.exe path');
 const directory = mkdtempSync(resolve('.qa', 'cli-中文 空格-'));
 const alias = join(directory, '发布包 空格');
 symlinkSync(resolve(executable, '..'), alias, 'junction');
-const cli = join(alias, 'human_cli.exe');
-const environment = { ...process.env, PATH: '', HUMAN_CLI_DATA_DIR: join(directory, 'data'), HUMAN_CLI_NO_AUTOSTART: '0' };
-delete environment.HUMAN_CLI_DESKTOP_EXE;
-delete environment.HUMAN_CLI_CACHE_DIR;
+const cli = join(alias, 'askForUserHelp.exe');
+const environment = { ...process.env, PATH: '', ASK_FOR_USER_HELP_DATA_DIR: join(directory, 'data'), ASK_FOR_USER_HELP_NO_AUTOSTART: '0' };
+delete environment.ASK_FOR_USER_HELP_DESKTOP_EXE;
+delete environment.ASK_FOR_USER_HELP_CACHE_DIR;
 const checks = [], check = (name, condition) => { assert.ok(condition, name); checks.push(name); };
 const invoke = (args, input) => new Promise((resolveResult, reject) => {
   const child = spawn(cli, args, { env: environment, windowsHide: true, stdio: 'pipe' });
@@ -29,12 +29,12 @@ const json = async (args, input) => { const result = await invoke(args, input); 
 let runtime, client;
 try {
   const help = await invoke(['--help']);
-  check('Native help exits successfully without starting desktop', help.code === 0 && help.stdout.includes('human_cli.exe') && !existsSync(join(environment.HUMAN_CLI_DATA_DIR, 'runtime.json')));
+  check('Native help exits successfully without starting desktop', help.code === 0 && help.stdout.includes('askForUserHelp.exe') && !existsSync(join(environment.ASK_FOR_USER_HELP_DATA_DIR, 'runtime.json')));
   const invalid = await invoke(['invalid-command']);
-  check('Native errors use stderr and nonzero exit status', invalid.code === 1 && invalid.stdout === '' && invalid.stderr.includes('E_HUMAN_CLI'));
+  check('Native errors use stderr and nonzero exit status', invalid.code === 1 && invalid.stdout === '' && invalid.stderr.includes('E_ASK_FOR_USER_HELP'));
   const plugins = await json(['plugins']);
   check('EXE autostarts desktop with no node.exe in PATH', plugins.length === 4);
-  runtime = JSON.parse(readFileSync(join(environment.HUMAN_CLI_DATA_DIR, 'runtime.json'), 'utf8'));
+  runtime = JSON.parse(readFileSync(join(environment.ASK_FOR_USER_HELP_DATA_DIR, 'runtime.json'), 'utf8'));
   const file = join(directory, '便签 请求.json');
   writeFileSync(file, JSON.stringify({ title: 'EXE 文件请求：中文与空格', plugins: [] }));
   const request = await json(['request', file, '--background']);
@@ -92,11 +92,11 @@ try {
   check('EXE mcp logs can recover CLI-created requests', JSON.parse(mcpLogs.content[0].text).entries.some((entry) => entry.id === request.id));
   await client.close(); client = null;
   await json(['cancel', stdin.id, '结束最后一张便签']);
-  for (let attempt = 0; attempt < 100 && existsSync(join(environment.HUMAN_CLI_DATA_DIR, 'runtime.json')); attempt++) await new Promise((done) => setTimeout(done, 50));
-  check('Packaged desktop exits automatically after the last task', !existsSync(join(environment.HUMAN_CLI_DATA_DIR, 'runtime.json')));
+  for (let attempt = 0; attempt < 100 && existsSync(join(environment.ASK_FOR_USER_HELP_DATA_DIR, 'runtime.json')); attempt++) await new Promise((done) => setTimeout(done, 50));
+  check('Packaged desktop exits automatically after the last task', !existsSync(join(environment.ASK_FOR_USER_HELP_DATA_DIR, 'runtime.json')));
   check('A later CLI query restarts the host and recovers logs', (await json(['logs', '1'])).entries.length === 1);
-  for (let attempt = 0; attempt < 100 && existsSync(join(environment.HUMAN_CLI_DATA_DIR, 'runtime.json')); attempt++) await new Promise((done) => setTimeout(done, 50));
-  check('Read-only packaged query leaves no resident desktop', !existsSync(join(environment.HUMAN_CLI_DATA_DIR, 'runtime.json')));
+  for (let attempt = 0; attempt < 100 && existsSync(join(environment.ASK_FOR_USER_HELP_DATA_DIR, 'runtime.json')); attempt++) await new Promise((done) => setTimeout(done, 50));
+  check('Read-only packaged query leaves no resident desktop', !existsSync(join(environment.ASK_FOR_USER_HELP_DATA_DIR, 'runtime.json')));
   writeFileSync(join(directory, 'acceptance.json'), JSON.stringify({ passed: checks.length, checks, executable, nodeAvailableInChildPath: false }, null, 2));
   console.log(`PACKAGED CLI PASS ${checks.length} checks ${directory}`);
 } finally {

@@ -22,7 +22,7 @@ try {
       const runtime = JSON.parse(readFileSync(path, 'utf8'));
       if (/^http:\/\/127\.0\.0\.1:\d+$/.test(runtime.url)) {
         const response = await fetch(runtime.url + '/health', { headers: { Authorization: `Bearer ${runtime.token}` }, signal: AbortSignal.timeout(1500) });
-        alive = response.ok && (await response.json()).name === 'human_cli';
+        alive = response.ok && (await response.json()).name === 'askForUserHelp';
       }
     } catch {}
     if (alive) { connected = true; failures = 0; }

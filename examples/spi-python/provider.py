@@ -1,4 +1,4 @@
-"""human_cli SPI v1 reference provider. Standard library only; no human_cli/Node import."""
+"""askForUserHelp SPI v1 reference provider. Standard library only; no askForUserHelp/Node import."""
 import argparse
 import base64
 import json
@@ -11,7 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 CATALOG = [{
     "apiVersion": 1, "id": "example.python-note", "version": "1.0.0",
-    "name": "Python 现场记录", "description": "独立 Python 服务生成文字与附件，不加载到 human_cli 进程。",
+    "name": "Python 现场记录", "description": "独立 Python 服务生成文字与附件，不加载到 askForUserHelp 进程。",
     "icon": "file-text", "side": "right",
     "configSchema": {"type": "object", "additionalProperties": False, "properties": {
         "prefix": {"type": "string", "title": "记录标题", "default": "现场记录", "maxLength": 100},
@@ -86,7 +86,7 @@ class Provider:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=7788)
-    parser.add_argument("--token", default=os.environ.get("HUMAN_CLI_SPI_TOKEN") or secrets.token_urlsafe(32))
+    parser.add_argument("--token", default=os.environ.get("ASK_FOR_USER_HELP_SPI_TOKEN") or secrets.token_urlsafe(32))
     args = parser.parse_args()
     provider = Provider()
 

@@ -10,8 +10,8 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 
 const output = resolve('.qa', `ordered-reply-${randomUUID().slice(0, 8)}`);
 mkdirSync(output, { recursive: true });
-process.env.HUMAN_CLI_DATA_DIR = join(output, 'data');
-process.env.HUMAN_CLI_CACHE_DIR = join(output, '软件 中文 空格', 'cache');
+process.env.ASK_FOR_USER_HELP_DATA_DIR = join(output, 'data');
+process.env.ASK_FOR_USER_HELP_CACHE_DIR = join(output, '软件 中文 空格', 'cache');
 const checks = [], errors = [];
 const check = (name, condition) => { assert.ok(condition, name); checks.push(name); console.log(`PASS ${name}`); };
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
@@ -20,7 +20,7 @@ let client, child;
 async function runAcceptance() {
 try {
   const desktop = await import('../desktop/main.mjs'); await desktop.ready;
-  const runtime = JSON.parse(readFileSync(join(process.env.HUMAN_CLI_DATA_DIR, 'runtime.json')));
+  const runtime = JSON.parse(readFileSync(join(process.env.ASK_FOR_USER_HELP_DATA_DIR, 'runtime.json')));
   const api = async (path, method = 'GET', body) => { const response = await fetch(runtime.url + path, { method, headers: { Authorization: `Bearer ${runtime.token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) }); const result = await response.json(); if (!response.ok) throw new Error(JSON.stringify(result)); return result; };
   const keeper = await api('/requests', 'POST', { title: '验收保活', plugins: [] });
   const r = await api('/requests', 'POST', { title: '截图和配置，请按顺序查看', agent: '协议验收', description: '文字、截图与文件可以交错编排。', plugins: [] });
@@ -63,11 +63,11 @@ try {
   writeFileSync(join(output, 'ordered-dark.png'), (await win.webContents.capturePage()).toPNG());
   check('Composer and submit button stay inside the paper', await js('(()=>{const c=document.querySelector(".composer").getBoundingClientRect(),p=document.querySelector(".paper").getBoundingClientRect(),s=document.querySelector("[data-action=complete]").getBoundingClientRect();return c.height>0&&s.bottom<=p.bottom&&s.right<=p.right})()'));
   let stdout = '', stderr = '';
-  child = spawn(process.execPath, [resolve('adapters/cli.mjs'), 'wait', r.id], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', HUMAN_CLI_NO_AUTOSTART: '1' }, stdio: 'pipe', windowsHide: true });
+  child = spawn(process.execPath, [resolve('adapters/cli.mjs'), 'wait', r.id], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', ASK_FOR_USER_HELP_NO_AUTOSTART: '1' }, stdio: 'pipe', windowsHide: true });
   child.stdout.on('data', (b) => { stdout += b; }); child.stderr.on('data', (b) => { stderr += b; });
   const cliDone = new Promise((done) => child.on('close', done));
   client = new Client({ name: 'ordered-native-test', version: '1' });
-  await client.connect(new StdioClientTransport({ command: process.execPath, args: [resolve('adapters/mcp.mjs')], env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', HUMAN_CLI_NO_AUTOSTART: '1' }, stderr: 'pipe' }));
+  await client.connect(new StdioClientTransport({ command: process.execPath, args: [resolve('adapters/mcp.mjs')], env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', ASK_FOR_USER_HELP_NO_AUTOSTART: '1' }, stderr: 'pipe' }));
   const mcpDone = client.callTool({ name: 'human_wait', arguments: { requestId: r.id } });
   await until(async () => (await api(`/requests/${r.id}`)).receiver.waiting);
   await js('document.querySelector("[data-action=complete]").click()');
@@ -76,7 +76,7 @@ try {
   assert.deepEqual(JSON.parse(mcp.content[0].text), cli);
   check('CLI and MCP return identical ordered JSON with no image blocks or Base64', mcp.content.length === 1 && cli.content.map((b) => b.type).join(',') === 'text,image,text,file,text' && !JSON.stringify(cli).includes('base64'));
   const files = cli.content.filter((b) => b.path);
-  check('Every delivered path is readable under the software cache root', files.every((b) => b.path.startsWith(process.env.HUMAN_CLI_CACHE_DIR) && existsSync(b.path)));
+  check('Every delivered path is readable under the software cache root', files.every((b) => b.path.startsWith(process.env.ASK_FOR_USER_HELP_CACHE_DIR) && existsSync(b.path)));
   assert.equal(readFileSync(files[0].path).toString('base64'), png);
   assert.equal(readFileSync(files[1].path, 'utf8'), '{"value":1}');
   const logs = await api('/logs'); const location = logs.entries.find((e) => e.id === r.id).cache;
